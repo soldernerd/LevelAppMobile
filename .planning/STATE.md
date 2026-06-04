@@ -67,9 +67,9 @@ Progress: [##--------] 20% (1/5 phases complete)
 
 ## Session Continuity
 
-**Last action:** Phase 1 executed — all 4 plans complete — 2026-06-04
-**Resume file:** `.planning/phases/01-data-models-protocol-parser/`
-**Next action:** Run `/gsd:discuss-phase 2` then `/gsd:plan-phase 2` then `/gsd:execute-phase 2`
+**Last action:** Phase 2 context gathered — 2026-06-04
+**Resume file:** `.planning/phases/02-ble-abstraction-mock-layer/02-CONTEXT.md`
+**Next action:** Run `/gsd:plan-phase 2`
 
 ## Last Updated
 

@@ -50,6 +50,8 @@ class MockBleManager implements BleManager {
 
   @override
   Future<void> startScan() async {
+    _scanTimer?.cancel(); // WR-01: cancel any in-flight scan timer
+    _scanTimer = null;
     _statusController.add(ConnectionStatus.scanning);
     _scanTimer = Timer(const Duration(milliseconds: 500), () {
       if (!_scanController.isClosed) {
@@ -70,20 +72,27 @@ class MockBleManager implements BleManager {
 
   @override
   Future<void> connect(String deviceId) async {
+    _stopTicker(); // CR-01: cancel any in-flight ticker before reconnecting
+    if (_statusController.isClosed) return; // CR-02: guard async gap
     _statusController.add(ConnectionStatus.connecting);
     await Future.delayed(const Duration(milliseconds: 300)); // D-05; CLAUDE.md constraint
     _angleX = 0.0; // reset on reconnect (Claude's discretion, D-12)
     _angleY = 0.0;
     _tickCount = 0;
-    _statusController.add(ConnectionStatus.connected);
-    _startTicker();
+    if (!_statusController.isClosed) { // CR-02: guard after async gap
+      _statusController.add(ConnectionStatus.connected);
+      _startTicker();
+    }
   }
 
   @override
   Future<void> disconnect() async {
+    if (_statusController.isClosed) return; // CR-02: guard against post-dispose call
     _statusController.add(ConnectionStatus.disconnecting); // D-13
     _stopTicker();
-    _statusController.add(ConnectionStatus.disconnected);
+    if (!_statusController.isClosed) {
+      _statusController.add(ConnectionStatus.disconnected);
+    }
   }
 
   @override

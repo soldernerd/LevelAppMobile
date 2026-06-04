@@ -101,8 +101,43 @@ Features to be addressed in WP2 (real BLE wiring) or a future milestone:
 
 ## Traceability
 
-*Filled by roadmap agent.*
+*Updated by roadmap agent — 2026-06-04*
 
-| REQ-ID | Phase |
-|--------|-------|
-| (to be populated) | |
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| PROT-01 | Phase 1 — Data Models + Protocol Parser | Pending |
+| PROT-02 | Phase 1 — Data Models + Protocol Parser | Pending |
+| PROT-03 | Phase 1 — Data Models + Protocol Parser | Pending |
+| PROT-04 | Phase 1 — Data Models + Protocol Parser | Pending |
+| ARCH-01 | Phase 1 — Data Models + Protocol Parser | Pending |
+| ARCH-02 | Phase 1 — Data Models + Protocol Parser | Pending |
+| MOCK-01 | Phase 2 — BLE Abstraction + Mock Layer | Pending |
+| MOCK-02 | Phase 2 — BLE Abstraction + Mock Layer | Pending |
+| MOCK-03 | Phase 2 — BLE Abstraction + Mock Layer | Pending |
+| MOCK-04 | Phase 2 — BLE Abstraction + Mock Layer | Pending |
+| CONN-01 | Phase 3 — Riverpod Provider Layer | Pending |
+| CONN-02 | Phase 3 — Riverpod Provider Layer | Pending |
+| CONN-03 | Phase 3 — Riverpod Provider Layer | Pending |
+| CONN-05 | Phase 3 — Riverpod Provider Layer | Pending |
+| CONN-06 | Phase 3 — Riverpod Provider Layer | Pending |
+| SYS-01 | Phase 3 — Riverpod Provider Layer | Pending |
+| SCAN-01 | Phase 4 — UI Screens | Pending |
+| SCAN-02 | Phase 4 — UI Screens | Pending |
+| SCAN-03 | Phase 4 — UI Screens | Pending |
+| SCAN-04 | Phase 4 — UI Screens | Pending |
+| SCAN-05 | Phase 4 — UI Screens | Pending |
+| INST-01 | Phase 4 — UI Screens | Pending |
+| INST-02 | Phase 4 — UI Screens | Pending |
+| INST-03 | Phase 4 — UI Screens | Pending |
+| INST-04 | Phase 4 — UI Screens | Pending |
+| INST-05 | Phase 4 — UI Screens | Pending |
+| INST-06 | Phase 4 — UI Screens | Pending |
+| INST-07 | Phase 4 — UI Screens | Pending |
+| CONN-04 | Phase 4 — UI Screens | Pending |
+| PERM-01 | Phase 5 — App Wiring + Platform Config | Pending |
+| PERM-02 | Phase 5 — App Wiring + Platform Config | Pending |
+| PERM-03 | Phase 5 — App Wiring + Platform Config | Pending |
+| PERM-04 | Phase 5 — App Wiring + Platform Config | Pending |
+| PERM-05 | Phase 5 — App Wiring + Platform Config | Pending |
+| BUILD-01 | Phase 5 — App Wiring + Platform Config | Pending |
+| BUILD-02 | Phase 5 — App Wiring + Platform Config | Pending |

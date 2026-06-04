@@ -60,7 +60,7 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 **Plans**: 1 plan in 1 wave
 
 **Wave 1**
-- [ ] 02-01-PLAN.md — fake_async dev dep, test scaffold, full MockBleManager implementation, test assertions for MOCK-01 through MOCK-04
+- [x] 02-01-PLAN.md — fake_async dev dep, test scaffold, full MockBleManager implementation, test assertions for MOCK-01 through MOCK-04
 
 ### Phase 3: Riverpod Provider Layer
 **Goal**: All app state (connection state machine, live instrument data, auto-reconnect stub) is managed by providers and observable without any UI
@@ -106,7 +106,7 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Data Models + Protocol Parser | 4/4 | Complete | 2026-06-04 |
-| 2. BLE Abstraction + Mock Layer | 0/1 | In progress | - |
+| 2. BLE Abstraction + Mock Layer | 1/1 | Complete | 2026-06-04 |
 | 3. Riverpod Provider Layer | 0/0 | Not started | - |
 | 4. UI Screens | 0/0 | Not started | - |
 | 5. App Wiring + Platform Config | 0/0 | Not started | - |

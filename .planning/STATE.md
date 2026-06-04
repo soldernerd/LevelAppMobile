@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 2 planned — ready to execute
+status: Phase 2 complete
 last_updated: "2026-06-04"
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 5
-  completed_plans: 4
-  percent: 20
+  completed_plans: 5
+  percent: 40
 ---
 
 # Project State
@@ -26,18 +26,18 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 | Phase | Name | Status |
 |-------|------|--------|
 | 1 | Data Models + Protocol Parser | Complete ✓ |
-| 2 | BLE Abstraction + Mock Layer | Planned (1 plan) |
+| 2 | BLE Abstraction + Mock Layer | Complete ✓ |
 | 3 | Riverpod Provider Layer | Not Started |
 | 4 | UI Screens | Not Started |
 | 5 | App Wiring + Platform Config | Not Started |
 
 ## Current Position
 
-**Active phase:** 2 — BLE Abstraction + Mock Layer
-**Active plan:** None (ready to execute Wave 1)
-**Status:** Phase 2 planned — 1 plan in 1 wave
+**Active phase:** 3 — Riverpod Provider Layer
+**Active plan:** None (Phase 3 not yet planned)
+**Status:** Phase 2 complete — all tests green, commits made
 
-Progress: [##--------] 20% (1/5 phases complete)
+Progress: [####------] 40% (2/5 phases complete)
 
 ## Performance Metrics
 
@@ -46,7 +46,7 @@ Progress: [##--------] 20% (1/5 phases complete)
 | Phases defined | 5 |
 | Requirements mapped | 36/36 |
 | Plans written | 1 |
-| Plans complete | 0 |
+| Plans complete | 1 |
 
 ## Accumulated Context
 
@@ -56,6 +56,10 @@ Progress: [##--------] 20% (1/5 phases complete)
 - MockBleManager is the only BleManager impl in WP1; swap to RealBleManager in WP2 is a single ProviderScope.overrides change
 - Random-walk mock data (not sine wave) for realistic feel
 - minSdkVersion 24 (Flutter 3.44+ engine minimum, supersedes flutter_blue_plus's documented 21)
+- MockBleManager uses eager-initialized broadcast StreamControllers for simultaneous multi-provider support in Phase 3
+- connect() resets _angleX/_angleY to 0.0 on reconnect for predictable Phase 4 testing
+- simulateDisconnect() is concrete-only (not @override) — BleManager isolation boundary enforced
+- fake_async promoted to direct dev dependency for explicit version pinning
 
 ### Active TODOs
 
@@ -67,10 +71,10 @@ Progress: [##--------] 20% (1/5 phases complete)
 
 ## Session Continuity
 
-**Last action:** Phase 2 planned — 1 plan written, verification passed — 2026-06-04
-**Resume file:** `.planning/phases/02-ble-abstraction-mock-layer/02-01-PLAN.md`
-**Next action:** Run `/gsd:execute-phase 2`
+**Last action:** Phase 2 complete — MockBleManager implemented, all 10 tests pass, 3 commits made — 2026-06-04
+**Resume file:** `.planning/phases/02-ble-abstraction-mock-layer/02-01-SUMMARY.md`
+**Next action:** `/gsd:discuss-phase 3` or `/gsd:plan-phase 3`
 
 ## Last Updated
 
-2026-06-04 — phase 2 planned (1 plan, verification passed, ready to execute)
+2026-06-04 — phase 2 complete (1 plan, 10 tests green, 3 commits, flutter analyze clean)

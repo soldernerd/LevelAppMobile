@@ -30,7 +30,23 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
   3. Service UUID, state characteristic UUID, and command characteristic UUID are defined as named constants in `ble_protocol.dart` (placeholder strings, not null)
   4. `abstract class BleManager` declares the full interface; `MockBleManager implements BleManager` compiles without stub warnings — no concrete `RealBleManager` class exists yet
   5. No widget file and no `flutter_blue_plus` import exists anywhere in `lib/ui/` or `lib/providers/` (enforced by project structure)
-**Plans**: TBD
+**Plans**: 4 plans in 4 waves
+
+**Wave 1**
+- [ ] 01-01-PLAN.md — Flutter project scaffold, pubspec.yaml dependencies, boilerplate wipe
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 01-02-PLAN.md — Data models (DeviceState, ScannedDevice, ConnectionStatus) and protocol parser (StatePacket, UUID/command constants)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 01-03-PLAN.md — BLE interface (abstract class BleManager) and Phase 1 stub (MockBleManager)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 01-04-PLAN.md — Provider stub (bleManagerProvider), finalized main.dart, round-trip unit tests
+
+**Cross-cutting constraints:**
+- No `flutter_blue_plus` import in `lib/ble/ble_manager.dart`, `lib/providers/`, or `lib/ui/` (Plans 01-02, 01-03, 01-04)
+- `ByteData.sublistView(Uint8List.fromList(bytes))` — mandatory List<int>→TypedData conversion (Plan 01-02)
 
 ### Phase 2: BLE Abstraction + Mock Layer
 **Goal**: MockBleManager produces realistic animated streams behind the BleManager interface; all mock behaviors are verifiable without running the app
@@ -86,7 +102,7 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Data Models + Protocol Parser | 0/0 | Not started | - |
+| 1. Data Models + Protocol Parser | 0/4 | In progress | - |
 | 2. BLE Abstraction + Mock Layer | 0/0 | Not started | - |
 | 3. Riverpod Provider Layer | 0/0 | Not started | - |
 | 4. UI Screens | 0/0 | Not started | - |

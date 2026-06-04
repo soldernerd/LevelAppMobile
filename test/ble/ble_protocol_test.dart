@@ -18,10 +18,20 @@ void main() {
       expect(state.battery, equals(battery));
     });
 
-    test('parse asserts on wrong packet length', () {
+    test('parse throws ArgumentError on wrong packet length', () {
       expect(
         () => StatePacket.parse([0, 1, 2]),
-        throwsA(isA<AssertionError>()),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('parse throws ArgumentError on battery > 100', () {
+      // Build a valid 9-byte packet with battery = 255 (firmware bug scenario).
+      final bytes = StatePacket.encode(0.0, 0.0, 0)..last; // reuse encode for angles
+      final badPacket = List<int>.from(bytes)..[8] = 255;
+      expect(
+        () => StatePacket.parse(badPacket),
+        throwsA(isA<ArgumentError>()),
       );
     });
 

@@ -6,7 +6,14 @@ import 'package:inclinometer/providers/device_provider.dart';
 void main() {
   runApp(
     ProviderScope(
-      overrides: [bleManagerProvider.overrideWith((_) => MockBleManager())],
+      overrides: [
+        // ref.keepAlive() prevents Riverpod from auto-disposing the BLE manager
+        // when the last widget-tree listener detaches during navigation (CLAUDE.md).
+        bleManagerProvider.overrideWith((ref) {
+          ref.keepAlive();
+          return MockBleManager();
+        }),
+      ],
       child: const MaterialApp(
         home: Scaffold(body: Center(child: Text('Phase 1'))),
       ),

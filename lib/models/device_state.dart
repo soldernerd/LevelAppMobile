@@ -49,14 +49,14 @@ class ScannedDevice {
     required this.rssi,
   });
 
+  // Identity is the device's BLE address / peripheral UUID only.
+  // name and rssi are mutable attributes — rssi changes on every advertisement,
+  // so including it would treat the same physical device as a different device
+  // across consecutive scan results.
   @override
   bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is ScannedDevice &&
-          id == other.id &&
-          name == other.name &&
-          rssi == other.rssi;
+      identical(this, other) || other is ScannedDevice && id == other.id;
 
   @override
-  int get hashCode => Object.hash(id, name, rssi);
+  int get hashCode => id.hashCode;
 }

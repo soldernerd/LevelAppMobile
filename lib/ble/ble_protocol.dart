@@ -18,18 +18,31 @@ const int kCmdZeroY = 0x02;
 class StatePacket {
   /// Parses a raw 9-byte BLE characteristic value into a [DeviceState].
   ///
-  /// Asserts that [bytes] is exactly 9 bytes (dev-time protocol contract).
+  /// Throws [ArgumentError] if [bytes] is not exactly 9 bytes, or if the
+  /// battery byte exceeds 100 (valid range is 0–100 percent).
+  /// Unlike `assert`, these guards fire in both debug and release builds.
   static DeviceState parse(List<int> bytes) {
-    assert(
-      bytes.length == 9,
-      'State packet must be 9 bytes, got ${bytes.length}',
-    );
+    if (bytes.length != 9) {
+      throw ArgumentError.value(
+        bytes.length,
+        'bytes',
+        'State packet must be exactly 9 bytes',
+      );
+    }
+    final rawBattery = bytes[8];
+    if (rawBattery > 100) {
+      throw ArgumentError.value(
+        rawBattery,
+        'battery',
+        'Battery must be 0–100 (got $rawBattery — firmware protocol error?)',
+      );
+    }
     // ByteData.sublistView requires TypedData — Uint8List.fromList() is mandatory.
     final bd = ByteData.sublistView(Uint8List.fromList(bytes));
     return DeviceState(
       angleX: bd.getFloat32(0, Endian.little),
       angleY: bd.getFloat32(4, Endian.little),
-      battery: bytes[8],
+      battery: rawBattery,
     );
   }
 

@@ -19,7 +19,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-04)
 
 **Core value:** A connected phone screen that shows live angle readings and lets the user zero each axis
-**Current focus:** Phase 1
+**Current focus:** Phase 3
 
 ## Phase Status
 

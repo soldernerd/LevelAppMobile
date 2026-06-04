@@ -11,7 +11,7 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 ## Phases
 
 - [x] **Phase 1: Data Models + Protocol Parser** — Define the wire format, typed packet model, command constants, GATT UUIDs, and BleManager interface contract
-- [ ] **Phase 2: BLE Abstraction + Mock Layer** — Implement MockBleManager producing animated random-walk streams behind the BleManager interface
+- [x] **Phase 2: BLE Abstraction + Mock Layer** — Implement MockBleManager producing animated random-walk streams behind the BleManager interface
 - [ ] **Phase 3: Riverpod Provider Layer** — Wire providers that expose connection state machine and live instrument data; no widgets yet
 - [ ] **Phase 4: UI Screens** — Build scan screen and instrument screen consuming providers; all states visible and navigable
 - [ ] **Phase 5: App Wiring + Platform Config** — main.dart, go_router, Android/iOS permissions, build.gradle SDK versions, wakelock

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:inclinometer/ble/ble_protocol.dart';
 import 'package:inclinometer/models/device_state.dart';
 import 'package:inclinometer/providers/device_provider.dart';
@@ -20,6 +21,15 @@ class InstrumentScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final status = ref.watch(connectionNotifierProvider);
     final dataAsync = ref.watch(instrumentDataProvider);
+
+    // Navigate back to /scan on disconnect or error (D-04: no refreshListenable,
+    // so we handle post-disconnect navigation imperatively here instead).
+    ref.listen(connectionNotifierProvider, (prev, next) {
+      if (next == ConnectionStatus.disconnected ||
+          next == ConnectionStatus.error) {
+        if (context.mounted) context.go('/scan');
+      }
+    });
 
     // CRITICAL: hasValue distinguishes AsyncData(null) [stale] from
     // AsyncLoading [not yet connected]. Do NOT use valueOrNull == null
@@ -170,14 +180,20 @@ class _AngleRow extends StatelessWidget {
             label,
             style: const TextStyle(fontSize: 16, color: Colors.white54),
           ),
-          Text(
-            _formatAngle(value),
-            style: const TextStyle(
-              fontSize: 80,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              fontFeatures: [FontFeature.tabularFigures()],
-              height: 1.0,
+          Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Text(
+                _formatAngle(value),
+                style: const TextStyle(
+                  fontSize: 80,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  fontFeatures: [FontFeature.tabularFigures()],
+                  height: 1.0,
+                ),
+              ),
             ),
           ),
           ElevatedButton(

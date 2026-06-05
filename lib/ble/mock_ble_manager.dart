@@ -68,6 +68,9 @@ class MockBleManager implements BleManager {
   Future<void> stopScan() async {
     _scanTimer?.cancel();
     _scanTimer = null;
+    if (!_statusController.isClosed) {
+      _statusController.add(ConnectionStatus.idle);
+    }
   }
 
   @override

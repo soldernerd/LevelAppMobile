@@ -131,21 +131,41 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
   }
 
   /// Clears accumulated scan results and starts a new BLE scan.
+  ///
+  /// Sets [ConnectionStatus.error] if the underlying BLE manager throws,
+  /// so callers do not need to handle the error themselves.
   Future<void> startScan() async {
     _scannedDevices.clear();
     // Reset revision counter so scanResultsProvider correctly shows empty list.
     ref.read(_scanRevisionProvider.notifier).reset();
-    await ref.read(bleManagerProvider).startScan();
+    try {
+      await ref.read(bleManagerProvider).startScan();
+    } catch (e) {
+      state = ConnectionStatus.error;
+    }
   }
 
   /// Stops the active BLE scan.
+  ///
+  /// Sets [ConnectionStatus.error] if the underlying BLE manager throws.
   Future<void> stopScan() async {
-    await ref.read(bleManagerProvider).stopScan();
+    try {
+      await ref.read(bleManagerProvider).stopScan();
+    } catch (e) {
+      state = ConnectionStatus.error;
+    }
   }
 
   /// Initiates connection to the device with [deviceId].
+  ///
+  /// Sets [ConnectionStatus.error] if the underlying BLE manager throws,
+  /// so callers do not need to handle the error themselves.
   Future<void> connect(String deviceId) async {
-    await ref.read(bleManagerProvider).connect(deviceId);
+    try {
+      await ref.read(bleManagerProvider).connect(deviceId);
+    } catch (e) {
+      state = ConnectionStatus.error;
+    }
   }
 
   /// Disconnects from the currently connected device.

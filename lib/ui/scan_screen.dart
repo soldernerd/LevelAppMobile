@@ -70,12 +70,20 @@ class ScanScreen extends ConsumerWidget {
                   isScanning ? Colors.red[400] : const Color(0xFF1E88E5),
               tooltip: isScanning ? 'Stop Scan' : 'Start Scan',
               onPressed: isScanning
-                  ? () => ref
-                      .read(connectionNotifierProvider.notifier)
-                      .stopScan()
-                  : () => ref
-                      .read(connectionNotifierProvider.notifier)
-                      .startScan(),
+                  ? () async {
+                      // ConnectionNotifier.stopScan() catches errors and sets
+                      // state = ConnectionStatus.error internally (WR-02).
+                      await ref
+                          .read(connectionNotifierProvider.notifier)
+                          .stopScan();
+                    }
+                  : () async {
+                      // ConnectionNotifier.startScan() catches errors and sets
+                      // state = ConnectionStatus.error internally (WR-02).
+                      await ref
+                          .read(connectionNotifierProvider.notifier)
+                          .startScan();
+                    },
               child: Icon(isScanning ? Icons.stop : Icons.bluetooth_searching),
             )
           : null,
@@ -153,9 +161,13 @@ class ScanScreen extends ConsumerWidget {
             '${device.rssi} dBm',
             style: const TextStyle(fontSize: 13, color: Colors.white70),
           ),
-          onTap: () => ref
-              .read(connectionNotifierProvider.notifier)
-              .connect(device.id),
+          onTap: () async {
+            // ConnectionNotifier.connect() catches errors and sets
+            // state = ConnectionStatus.error internally (WR-02).
+            await ref
+                .read(connectionNotifierProvider.notifier)
+                .connect(device.id);
+          },
         );
       },
     );

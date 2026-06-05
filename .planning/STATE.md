@@ -7,7 +7,7 @@ last_updated: "2026-06-05T06:47:08.708Z"
 progress:
   total_phases: 5
   completed_phases: 2
-  total_plans: 5
+  total_plans: 8
   completed_plans: 5
   percent: 40
 ---
@@ -27,15 +27,15 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 |-------|------|--------|
 | 1 | Data Models + Protocol Parser | Complete ✓ |
 | 2 | BLE Abstraction + Mock Layer | Complete ✓ |
-| 3 | Riverpod Provider Layer | Not Started |
+| 3 | Riverpod Provider Layer | Planned |
 | 4 | UI Screens | Not Started |
 | 5 | App Wiring + Platform Config | Not Started |
 
 ## Current Position
 
 **Active phase:** 3 — Riverpod Provider Layer
-**Active plan:** None (Phase 3 not yet planned)
-**Status:** Phase 2 complete — all tests green, commits made
+**Active plan:** 03-01 (Wave 1 first)
+**Status:** Phase 3 planned — ready to execute (3 plans, 3 waves)
 
 Progress: [####------] 40% (2/5 phases complete)
 

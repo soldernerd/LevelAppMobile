@@ -96,14 +96,14 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 **Plans**: 4 plans in 3 waves
 
 **Wave 1**
-- [ ] 04-01-PLAN.md — sendCommand addition to ConnectionNotifier + test/ui/ scaffold files
+- [x] 04-01-PLAN.md — sendCommand addition to ConnectionNotifier + test/ui/ scaffold files
 
 **Wave 2** *(blocked on Wave 1 completion — parallel pair)*
-- [ ] 04-02-PLAN.md — ScanScreen ConsumerWidget + Phase 4 temporary main.dart
-- [ ] 04-03-PLAN.md — InstrumentScreen ConsumerWidget with stale animation + debug button
+- [x] 04-02-PLAN.md — ScanScreen ConsumerWidget + Phase 4 temporary main.dart
+- [x] 04-03-PLAN.md — InstrumentScreen ConsumerWidget with stale animation + debug button
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 04-04-PLAN.md — Widget test suites for scan_screen_test.dart and instrument_screen_test.dart
+- [x] 04-04-PLAN.md — Widget test suites for scan_screen_test.dart and instrument_screen_test.dart
 
 ### Phase 5: App Wiring + Platform Config
 **Goal**: The app boots correctly on Android with a complete main.dart, go_router navigation, runtime permission flow, and correct build.gradle SDK settings; iOS scaffold is structurally in place

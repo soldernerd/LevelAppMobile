@@ -12,7 +12,7 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 
 - [x] **Phase 1: Data Models + Protocol Parser** — Define the wire format, typed packet model, command constants, GATT UUIDs, and BleManager interface contract
 - [x] **Phase 2: BLE Abstraction + Mock Layer** — Implement MockBleManager producing animated random-walk streams behind the BleManager interface
-- [ ] **Phase 3: Riverpod Provider Layer** — Wire providers that expose connection state machine and live instrument data; no widgets yet
+- [x] **Phase 3: Riverpod Provider Layer** — Wire providers that expose connection state machine and live instrument data; no widgets yet (completed 2026-06-05)
 - [ ] **Phase 4: UI Screens** — Build scan screen and instrument screen consuming providers; all states visible and navigable
 - [ ] **Phase 5: App Wiring + Platform Config** — main.dart, go_router, Android/iOS permissions, build.gradle SDK versions, wakelock
 
@@ -81,7 +81,7 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 - [x] 03-02-PLAN.md — ConnectionNotifier, scanResultsProvider, instrumentDataProvider
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 03-03-PLAN.md — Provider test suite (CONN-01 through CONN-06, SYS-01)
+- [x] 03-03-PLAN.md — Provider test suite (CONN-01 through CONN-06, SYS-01)
 
 ### Phase 4: UI Screens
 **Goal**: A running app shows the scan screen and instrument screen with all data states and navigation paths working end-to-end against the mock layer
@@ -116,6 +116,6 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 |-------|----------------|--------|-----------|
 | 1. Data Models + Protocol Parser | 4/4 | Complete | 2026-06-04 |
 | 2. BLE Abstraction + Mock Layer | 1/1 | Complete | 2026-06-04 |
-| 3. Riverpod Provider Layer | 2/3 | In Progress|  |
+| 3. Riverpod Provider Layer | 3/3 | Complete   | 2026-06-05 |
 | 4. UI Screens | 0/0 | Not started | - |
 | 5. App Wiring + Platform Config | 0/0 | Not started | - |

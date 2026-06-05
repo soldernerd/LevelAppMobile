@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-06-05T07:30:38.688Z"
+last_updated: "2026-06-05T07:38:34.266Z"
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 8
-  completed_plans: 7
-  percent: 40
+  completed_plans: 8
+  percent: 60
 ---
 
 # Project State
@@ -27,17 +27,17 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 |-------|------|--------|
 | 1 | Data Models + Protocol Parser | Complete ✓ |
 | 2 | BLE Abstraction + Mock Layer | Complete ✓ |
-| 3 | Riverpod Provider Layer | Planned |
+| 3 | Riverpod Provider Layer | Complete ✓ |
 | 4 | UI Screens | Not Started |
 | 5 | App Wiring + Platform Config | Not Started |
 
 ## Current Position
 
-**Active phase:** 3 — Riverpod Provider Layer
-**Active plan:** 03-03 (Wave 3)
-**Status:** Phase 3 executing — plan 03-02 complete
+**Active phase:** 4 — UI Screens
+**Active plan:** Next to plan
+**Status:** Phase 3 complete — all 3 plans done, 23 tests green
 
-Progress: [█████████░] 88%
+Progress: [██████████] 100% (Phase 3)
 
 ## Performance Metrics
 
@@ -63,6 +63,8 @@ Progress: [█████████░] 88%
 - wakelock_plus installed via flutter pub add, auto-resolved to version 1.6.1
 - instrumentDataProvider uses StreamProvider<DeviceState?> — StatePacket.parse() returns DeviceState not StatePacket
 - state = state; reassignment used for scanResultsProvider rebuild trigger (ref.notifyListeners() not available in Riverpod 3.3.1 Notifier)
+- flutter_test used for provider tests to enable TestWidgetsFlutterBinding — WakelockPlus requires Flutter binding even in unit tests
+- WakelockPlus.enable/disable wrapped with .catchError (async Future) not try/catch (sync) — platform channel errors are async
 
 ### Active TODOs
 
@@ -74,10 +76,10 @@ Progress: [█████████░] 88%
 
 ## Session Continuity
 
-**Last action:** Phase 3 plan 03-02 complete — ConnectionNotifier, scanResultsProvider, instrumentDataProvider implemented; all 10 tests pass — 2026-06-05
+**Last action:** Phase 3 plan 03-03 complete — 13 new provider tests (8 + 5), 23 total tests green, flutter analyze clean — 2026-06-05
 **Resume file:** .planning/phases/03-riverpod-provider-layer/03-CONTEXT.md
-**Next action:** Execute plan 03-03
+**Next action:** Plan Phase 4 UI Screens
 
 ## Last Updated
 
-2026-06-05 — phase 3 plan 03-02 complete (2 tasks, 10 tests green, 1 commit, flutter analyze clean)
+2026-06-05 — Phase 3 complete (3 plans, 23 tests green, flutter analyze clean)

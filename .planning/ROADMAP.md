@@ -14,7 +14,7 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 - [x] **Phase 2: BLE Abstraction + Mock Layer** — Implement MockBleManager producing animated random-walk streams behind the BleManager interface
 - [x] **Phase 3: Riverpod Provider Layer** — Wire providers that expose connection state machine and live instrument data; no widgets yet (completed 2026-06-05)
 - [ ] **Phase 4: UI Screens** — Build scan screen and instrument screen consuming providers; all states visible and navigable
-- [ ] **Phase 5: App Wiring + Platform Config** — main.dart, go_router, Android/iOS permissions, build.gradle SDK versions, wakelock
+- [x] **Phase 5: App Wiring + Platform Config** — main.dart, go_router, Android/iOS permissions, build.gradle SDK versions, wakelock (completed 2026-06-05)
 
 ---
 
@@ -118,11 +118,11 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 **Plans**: 3 plans in 2 waves
 
 **Wave 1** *(parallel pair — no shared files)*
-- [ ] 05-01-PLAN.md — Android/iOS platform config: build.gradle.kts SDK versions + AndroidManifest.xml BLE permissions + Info.plist Bluetooth usage description
-- [ ] 05-02-PLAN.md — Add go_router + permission_handler to pubspec; add blePermissionPermanentlyDeniedProvider to device_provider.dart
+- [x] 05-01-PLAN.md — Android/iOS platform config: build.gradle.kts SDK versions + AndroidManifest.xml BLE permissions + Info.plist Bluetooth usage description
+- [x] 05-02-PLAN.md — Add go_router + permission_handler to pubspec; add blePermissionPermanentlyDeniedProvider to device_provider.dart
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 05-03-PLAN.md — Production main.dart (ProviderContainer + GoRouter + RouterNotifier + permission check) + ScanScreen go_router navigation + inline denied banner
+- [x] 05-03-PLAN.md — Production main.dart (ProviderContainer + GoRouter + RouterNotifier + permission check) + ScanScreen go_router navigation + inline denied banner
 
 ---
 
@@ -134,4 +134,4 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 | 2. BLE Abstraction + Mock Layer | 1/1 | Complete | 2026-06-04 |
 | 3. Riverpod Provider Layer | 3/3 | Complete   | 2026-06-05 |
 | 4. UI Screens | 0/4 | Not started | - |
-| 5. App Wiring + Platform Config | 0/3 | Not started | - |
+| 5. App Wiring + Platform Config | 3/3 | Complete   | 2026-06-05 |

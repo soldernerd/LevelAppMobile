@@ -37,9 +37,9 @@
 ### Permissions (Android)
 
 - [ ] **PERM-01**: `AndroidManifest.xml` declares `BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT`, and `ACCESS_FINE_LOCATION` permissions
-- [ ] **PERM-02**: App requests runtime BLE permissions via `permission_handler` before initiating any scan
-- [ ] **PERM-03**: Permission request includes a rationale dialog shown before the system permission prompt
-- [ ] **PERM-04**: App handles the permanently-denied case by directing the user to `openAppSettings()` with an explanation
+- [x] **PERM-02**: App requests runtime BLE permissions via `permission_handler` before initiating any scan
+- [x] **PERM-03**: Permission request includes a rationale dialog shown before the system permission prompt
+- [x] **PERM-04**: App handles the permanently-denied case by directing the user to `openAppSettings()` with an explanation
 - [ ] **PERM-05**: iOS `Info.plist` includes a Bluetooth usage description string (cross-platform scaffold; not tested in WP1)
 
 ### Mock BLE Layer
@@ -135,9 +135,9 @@ Features to be addressed in WP2 (real BLE wiring) or a future milestone:
 | INST-07 | Phase 4 — UI Screens | Pending |
 | CONN-04 | Phase 4 — UI Screens | Pending |
 | PERM-01 | Phase 5 — App Wiring + Platform Config | Pending |
-| PERM-02 | Phase 5 — App Wiring + Platform Config | Pending |
-| PERM-03 | Phase 5 — App Wiring + Platform Config | Pending |
-| PERM-04 | Phase 5 — App Wiring + Platform Config | Pending |
+| PERM-02 | Phase 5 — App Wiring + Platform Config | Complete |
+| PERM-03 | Phase 5 — App Wiring + Platform Config | Complete |
+| PERM-04 | Phase 5 — App Wiring + Platform Config | Complete |
 | PERM-05 | Phase 5 — App Wiring + Platform Config | Pending |
 | BUILD-01 | Phase 5 — App Wiring + Platform Config | Pending |
 | BUILD-02 | Phase 5 — App Wiring + Platform Config | Pending |

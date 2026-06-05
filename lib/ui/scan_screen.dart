@@ -21,8 +21,11 @@ class ScanScreen extends ConsumerWidget {
         .toList();
 
     // Navigate to InstrumentScreen on connect (post-frame to avoid build-phase push).
+    // Guard: prev != connected prevents duplicate push when provider rebuilds
+    // while already connected (e.g. scan-revision increment triggers rebuild).
     ref.listen(connectionNotifierProvider, (prev, next) {
-      if (next == ConnectionStatus.connected) {
+      if (next == ConnectionStatus.connected &&
+          prev != ConnectionStatus.connected) {
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const InstrumentScreen()),
         );

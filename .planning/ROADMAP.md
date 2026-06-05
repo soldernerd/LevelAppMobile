@@ -72,7 +72,16 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
   3. The auto-reconnect stub provider exists with backoff logic wired; it does not initiate any reconnection attempt in WP1 (a flag or disabled constant controls this, verifiable in code inspection or test)
   4. The wakelock provider acquires the screen lock when the connection state transitions to `connected` and releases it on `disconnected` (verifiable by mocking `wakelock_plus` in a test or by running the app and observing screen behavior)
   5. When the mock manager enters a reconnecting state (amber/stub), the provider exposes a distinct `reconnecting` state value separate from `disconnected`
-**Plans**: TBD
+**Plans**: 3 plans in 3 waves
+
+**Wave 1**
+- [ ] 03-01-PLAN.md — Add reconnecting enum value + wakelock_plus dependency
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 03-02-PLAN.md — ConnectionNotifier, scanResultsProvider, instrumentDataProvider
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 03-03-PLAN.md — Provider test suite (CONN-01 through CONN-06, SYS-01)
 
 ### Phase 4: UI Screens
 **Goal**: A running app shows the scan screen and instrument screen with all data states and navigation paths working end-to-end against the mock layer
@@ -107,6 +116,6 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 |-------|----------------|--------|-----------|
 | 1. Data Models + Protocol Parser | 4/4 | Complete | 2026-06-04 |
 | 2. BLE Abstraction + Mock Layer | 1/1 | Complete | 2026-06-04 |
-| 3. Riverpod Provider Layer | 0/0 | Not started | - |
+| 3. Riverpod Provider Layer | 0/3 | Not started | - |
 | 4. UI Screens | 0/0 | Not started | - |
 | 5. App Wiring + Platform Config | 0/0 | Not started | - |

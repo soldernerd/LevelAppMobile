@@ -149,6 +149,14 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
   Future<void> disconnect() async {
     await ref.read(bleManagerProvider).disconnect();
   }
+
+  /// Sends a command byte to the instrument via [BleManager].
+  ///
+  /// Used by Zero X / Zero Y buttons in InstrumentScreen.
+  /// Keeps [BleManager] access out of [lib/ui/] per CLAUDE.md architecture rule.
+  Future<void> sendCommand(int commandByte) async {
+    await ref.read(bleManagerProvider).sendCommand(commandByte);
+  }
 }
 
 /// Provider for the connection state machine.

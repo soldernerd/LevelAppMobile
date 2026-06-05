@@ -27,12 +27,12 @@
 
 ### Connection Management
 
-- [ ] **CONN-01**: App implements a connection state machine with states: idle, scanning, connecting, connected, disconnecting, disconnected, error
-- [ ] **CONN-02**: User can disconnect from the instrument via a disconnect button on the instrument screen
-- [ ] **CONN-03**: Auto-reconnect stub is structurally in place (backoff logic wired, not activated in WP1)
+- [x] **CONN-01**: App implements a connection state machine with states: idle, scanning, connecting, connected, disconnecting, disconnected, error
+- [x] **CONN-02**: User can disconnect from the instrument via a disconnect button on the instrument screen
+- [x] **CONN-03**: Auto-reconnect stub is structurally in place (backoff logic wired, not activated in WP1)
 - [ ] **CONN-04**: A connection state chip (e.g. green/amber/red) is always visible on the instrument screen
-- [ ] **CONN-05**: When BLE disconnects unexpectedly, the instrument screen visually indicates stale data (e.g. greyed-out readout or disconnected badge) — last-known values are never shown as live after disconnect
-- [ ] **CONN-06**: While auto-reconnect stub is active, a "Reconnecting…" state is shown (amber) rather than silence
+- [x] **CONN-05**: When BLE disconnects unexpectedly, the instrument screen visually indicates stale data (e.g. greyed-out readout or disconnected badge) — last-known values are never shown as live after disconnect
+- [x] **CONN-06**: While auto-reconnect stub is active, a "Reconnecting…" state is shown (amber) rather than silence
 
 ### Permissions (Android)
 
@@ -68,7 +68,7 @@
 
 ### System Behavior
 
-- [ ] **SYS-01**: Screen-on lock acquired via `wakelock_plus` when connected; released on disconnect — screen never sleeps mid-measurement
+- [x] **SYS-01**: Screen-on lock acquired via `wakelock_plus` when connected; released on disconnect — screen never sleeps mid-measurement
 
 ---
 
@@ -115,12 +115,12 @@ Features to be addressed in WP2 (real BLE wiring) or a future milestone:
 | MOCK-02 | Phase 2 — BLE Abstraction + Mock Layer | Pending |
 | MOCK-03 | Phase 2 — BLE Abstraction + Mock Layer | Pending |
 | MOCK-04 | Phase 2 — BLE Abstraction + Mock Layer | Pending |
-| CONN-01 | Phase 3 — Riverpod Provider Layer | Pending |
-| CONN-02 | Phase 3 — Riverpod Provider Layer | Pending |
-| CONN-03 | Phase 3 — Riverpod Provider Layer | Pending |
-| CONN-05 | Phase 3 — Riverpod Provider Layer | Pending |
-| CONN-06 | Phase 3 — Riverpod Provider Layer | Pending |
-| SYS-01 | Phase 3 — Riverpod Provider Layer | Pending |
+| CONN-01 | Phase 3 — Riverpod Provider Layer | Complete |
+| CONN-02 | Phase 3 — Riverpod Provider Layer | Complete |
+| CONN-03 | Phase 3 — Riverpod Provider Layer | Complete |
+| CONN-05 | Phase 3 — Riverpod Provider Layer | Complete |
+| CONN-06 | Phase 3 — Riverpod Provider Layer | Complete |
+| SYS-01 | Phase 3 — Riverpod Provider Layer | Complete |
 | SCAN-01 | Phase 4 — UI Screens | Pending |
 | SCAN-02 | Phase 4 — UI Screens | Pending |
 | SCAN-03 | Phase 4 — UI Screens | Pending |

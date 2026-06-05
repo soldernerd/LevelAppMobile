@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-last_updated: "2026-06-05T07:27:20.487Z"
+last_updated: "2026-06-05T07:30:38.688Z"
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 8
-  completed_plans: 6
+  completed_plans: 7
   percent: 40
 ---
 
@@ -34,10 +34,10 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 ## Current Position
 
 **Active phase:** 3 — Riverpod Provider Layer
-**Active plan:** 03-02 (Wave 2)
-**Status:** Phase 3 executing — plan 03-01 complete
+**Active plan:** 03-03 (Wave 3)
+**Status:** Phase 3 executing — plan 03-02 complete
 
-Progress: [████████░░] 75%
+Progress: [█████████░] 88%
 
 ## Performance Metrics
 
@@ -61,6 +61,8 @@ Progress: [████████░░] 75%
 - simulateDisconnect() is concrete-only (not @override) — BleManager isolation boundary enforced
 - fake_async promoted to direct dev dependency for explicit version pinning
 - wakelock_plus installed via flutter pub add, auto-resolved to version 1.6.1
+- instrumentDataProvider uses StreamProvider<DeviceState?> — StatePacket.parse() returns DeviceState not StatePacket
+- state = state; reassignment used for scanResultsProvider rebuild trigger (ref.notifyListeners() not available in Riverpod 3.3.1 Notifier)
 
 ### Active TODOs
 
@@ -72,10 +74,10 @@ Progress: [████████░░] 75%
 
 ## Session Continuity
 
-**Last action:** Phase 3 plan 03-01 complete — ConnectionStatus.reconnecting added, wakelock_plus added, all 10 tests pass — 2026-06-05
+**Last action:** Phase 3 plan 03-02 complete — ConnectionNotifier, scanResultsProvider, instrumentDataProvider implemented; all 10 tests pass — 2026-06-05
 **Resume file:** .planning/phases/03-riverpod-provider-layer/03-CONTEXT.md
-**Next action:** Execute plan 03-02
+**Next action:** Execute plan 03-03
 
 ## Last Updated
 
-2026-06-05 — phase 3 plan 03-01 complete (2 tasks, 10 tests green, 2 commits, flutter analyze clean)
+2026-06-05 — phase 3 plan 03-02 complete (2 tasks, 10 tests green, 1 commit, flutter analyze clean)

@@ -61,11 +61,11 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
     final scanSub = manager.scanResults.listen((device) {
       if (!_scannedDevices.contains(device)) {
         _scannedDevices.add(device);
-        // state reassignment triggers scanResultsProvider to re-evaluate.
-        // ref.notifyListeners() is NOT available on Ref in Riverpod 3.3.1 Notifier
-        // (RESOLVED: A1) — use state = state; instead.
-        // ignore: invalid_use_of_protected_member, unnecessary_statements
-        state = state;
+        // Increment the scan revision counter so scanResultsProvider rebuilds.
+        // `state = state` is suppressed by Riverpod's equality check when the
+        // ConnectionStatus value is unchanged (e.g. scanning → scanning).
+        // Using a dedicated revision counter avoids this pitfall (BUGFIX: A1).
+        ref.read(_scanRevisionProvider.notifier).increment();
       }
     });
 
@@ -132,6 +132,8 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
   /// Clears accumulated scan results and starts a new BLE scan.
   Future<void> startScan() async {
     _scannedDevices.clear();
+    // Reset revision counter so scanResultsProvider correctly shows empty list.
+    ref.read(_scanRevisionProvider.notifier).reset();
     await ref.read(bleManagerProvider).startScan();
   }
 
@@ -167,13 +169,28 @@ final connectionNotifierProvider =
   ConnectionNotifier.new,
 );
 
+/// Internal revision counter incremented whenever a new scan result arrives.
+///
+/// Watching this provider triggers [scanResultsProvider] to re-evaluate even
+/// when [ConnectionStatus] hasn't changed (which Riverpod would suppress via
+/// equality — see BUGFIX: A1 in [ConnectionNotifier.build]).
+class _ScanRevisionNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void increment() => state = state + 1;
+  void reset() => state = 0;
+}
+
+final _scanRevisionProvider =
+    NotifierProvider<_ScanRevisionNotifier, int>(_ScanRevisionNotifier.new);
+
 /// Derived provider exposing accumulated scan results.
 ///
-/// Watches [connectionNotifierProvider] as a rebuild trigger — when the notifier
-/// reassigns state (e.g., after adding a scanned device), this provider re-evaluates
-/// and returns the updated unmodifiable list (D-03).
+/// Watches [_scanRevisionProvider] as the rebuild trigger — incremented by
+/// [ConnectionNotifier] whenever a new device is added to the scan list.
 final scanResultsProvider = Provider<List<ScannedDevice>>((ref) {
-  ref.watch(connectionNotifierProvider); // rebuild trigger on state change
+  ref.watch(_scanRevisionProvider); // rebuild trigger on each new scan result
   return ref.read(connectionNotifierProvider.notifier).scannedDevices;
 });
 

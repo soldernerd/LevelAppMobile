@@ -1,21 +1,23 @@
+// main.dart — Phase 4 temporary entry point.
+// Replaced entirely in Phase 5 by the go_router + permission-handler version.
+// Do NOT add go_router, permission_handler, or platform wiring here.
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inclinometer/ble/mock_ble_manager.dart';
 import 'package:inclinometer/providers/device_provider.dart';
+import 'package:inclinometer/ui/scan_screen.dart';
 
 void main() {
   runApp(
     ProviderScope(
       overrides: [
-        // ref.keepAlive() prevents Riverpod from auto-disposing the BLE manager
-        // when the last widget-tree listener detaches during navigation (CLAUDE.md).
-        bleManagerProvider.overrideWith((ref) {
-          ref.keepAlive();
-          return MockBleManager();
-        }),
+        bleManagerProvider.overrideWithValue(MockBleManager()),
       ],
-      child: const MaterialApp(
-        home: Scaffold(body: Center(child: Text('Phase 1'))),
+      child: MaterialApp(
+        title: 'Inclinometer',
+        theme: ThemeData.dark(),
+        home: const ScanScreen(),
+        debugShowCheckedModeBanner: false,
       ),
     ),
   );

@@ -601,17 +601,17 @@ String _chipLabel(ConnectionStatus status) => switch (status) {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **`sendCommand` on `ConnectionNotifier`**
    - What we know: `BleManager.sendCommand(int)` exists; `ConnectionNotifier` does not expose it
    - What's unclear: Whether to add it to `ConnectionNotifier` or use a different routing approach
-   - Recommendation: Add `sendCommand(int commandByte)` to `ConnectionNotifier` — consistent with all other action methods; prevents any future `bleManagerProvider` direct access from UI
+   - RESOLVED: Add `sendCommand(int commandByte)` to `ConnectionNotifier` — consistent with all other action methods; prevents any future `bleManagerProvider` direct access from UI. Implemented in plan 04-01.
 
 2. **Phase 4 navigation approach**
    - What we know: Phase 5 owns go_router; Phase 4 needs something runnable
    - What's unclear: Whether to add a minimal `Navigator.push` in `ScanScreen.onTap` or a root-level status-watching `Consumer`
-   - Recommendation: Simplest approach — inside `ScanScreen`, when `connectionNotifierProvider` reaches `connected`, use `Navigator.push` to `InstrumentScreen`. This is replaced entirely by go_router in Phase 5.
+   - RESOLVED: Simplest approach — inside `ScanScreen`, when `connectionNotifierProvider` reaches `connected`, use `Navigator.push` to `InstrumentScreen`. This is replaced entirely by go_router in Phase 5. Implemented in plan 04-02.
 
 ---
 

@@ -10,6 +10,18 @@ import 'package:inclinometer/providers/device_provider.dart';
 import 'package:inclinometer/ui/instrument_screen.dart';
 import 'package:inclinometer/ui/scan_screen.dart';
 
+// WR-02: Dispose _container when the app process is torn down by the OS.
+// WidgetsBindingObserver is the only reliable hook that fires on detach
+// (process exit / task-swipe on Android) — the isolate can still run briefly.
+class _AppLifecycleObserver extends WidgetsBindingObserver {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.detached) {
+      _container.dispose();
+    }
+  }
+}
+
 // WP2 swap point: replace MockBleManager() with RealBleManager() here.
 // All overrides live on _container — ProviderScope uses parent: _container.
 final _container = ProviderContainer(
@@ -52,12 +64,20 @@ Future<void> main() async {
   // called before any platform channel calls (e.g. permission_handler).
   WidgetsFlutterBinding.ensureInitialized();
 
+  // WR-02: Register lifecycle observer so _container is disposed on app detach.
+  WidgetsBinding.instance.addObserver(_AppLifecycleObserver());
+
   // D-01: Cold-start check — detect permanently denied BLE permissions on Android.
   // Writes result to _container so ScanScreen can read it immediately on first build.
+  // CR-01 fix: check .status first; isPermanentlyDenied returns true on fresh installs
+  // if called directly without first reading .status (permission_handler behaviour).
   if (Platform.isAndroid) {
+    final scanStatus = await Permission.bluetoothScan.status;
+    final connectStatus = await Permission.bluetoothConnect.status;
     final permanentlyDenied =
-        await Permission.bluetoothScan.isPermanentlyDenied ||
-            await Permission.bluetoothConnect.isPermanentlyDenied;
+        (scanStatus.isPermanentlyDenied || connectStatus.isPermanentlyDenied) &&
+        !scanStatus.isGranted &&
+        !connectStatus.isGranted;
     _container
         .read(blePermissionPermanentlyDeniedProvider.notifier)
         .state = permanentlyDenied;

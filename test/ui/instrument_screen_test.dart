@@ -50,11 +50,12 @@ Future<void> _setWideSurface(WidgetTester tester) async {
   addTearDown(() => tester.binding.setSurfaceSize(null));
 }
 
-/// A stream that emits a single [DeviceState] and stays open.
-Stream<DeviceState?> _singleStateStream(DeviceState state) {
-  final controller = StreamController<DeviceState?>();
-  controller.add(state);
-  return controller.stream;
+/// A stream that emits a single [DeviceState] then closes.
+///
+/// Uses an async* generator instead of a [StreamController] to avoid leaking
+/// an unclosed controller for the duration of the test (WR-04).
+Stream<DeviceState?> _singleStateStream(DeviceState state) async* {
+  yield state;
 }
 
 void main() {

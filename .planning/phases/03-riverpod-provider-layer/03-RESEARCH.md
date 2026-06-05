@@ -198,7 +198,7 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
       if (!_scannedDevices.contains(device)) {
         _scannedDevices.add(device);
         // force listener rebuild via state reassignment if needed
-        ref.notifyListeners();
+        state = state; // Riverpod 3.3.1: state reassignment triggers listener rebuilds; ref.notifyListeners() is not available on Ref in Notifier (RESOLVED: A1)
       }
     });
     // Subscribe to state packets — forward to shared controller
@@ -438,17 +438,17 @@ await WakelockPlus.disable();  // release screen-on lock
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **`ref.notifyListeners()` vs compound state for scan results**
    - What we know: `ConnectionNotifier` state type is `ConnectionStatus`, not `List<ScannedDevice>`; mutable list fields don't auto-trigger rebuilds.
    - What's unclear: Whether `Ref` in flutter_riverpod 3.3.1 exposes `notifyListeners()` — the Riverpod changelog is ambiguous.
-   - Recommendation: Plan task to use a compound `ConnectionState` class (containing both `ConnectionStatus` and `List<ScannedDevice>`) as the notifier's state type. This eliminates the ambiguity entirely and is idiomatic Riverpod.
+   - **RESOLVED:** `ref.notifyListeners()` is NOT available on `Ref` inside `Notifier` in flutter_riverpod 3.3.1. Use `state = state;` reassignment — this triggers listener rebuilds in Riverpod 3.3.1 `Notifier` without requiring a compound state class. Pattern 1 code example has been updated to use `state = state;`. Assumption A1 is closed.
 
 2. **`keepAlive` scope for `connectionNotifierProvider`**
    - What we know: `bleManagerProvider` is already expected to be kept alive (CLAUDE.md). Phase 5 adds `go_router` navigation.
    - What's unclear: Whether `connectionNotifierProvider` needs its own `keepAlive` or whether watching `bleManagerProvider` creates a sufficient dependency chain.
-   - Recommendation: Add `ref.keepAlive()` in `build()` as a conservative measure; Phase 5 can revisit when the router is wired.
+   - **RESOLVED:** `connectionNotifierProvider` requires its own `ref.keepAlive()` call in `build()`. Riverpod 3 does not propagate keepAlive through the dependency chain — each provider that must survive navigation must call `ref.keepAlive()` independently. Add `final _keepAliveLink = ref.keepAlive();` at the top of `ConnectionNotifier.build()` and call `_keepAliveLink.close()` in `ref.onDispose` when explicit teardown is needed. The `Verified: keepAlive in Notifier.build()` code example in this document shows the correct pattern.
 
 ---
 

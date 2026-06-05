@@ -1,9 +1,11 @@
 ---
 phase: 05
-status: findings
+status: fixed
 critical: 1
 warning: 4
 info: 3
+fixed_critical: 1
+fixed_warning: 3
 ---
 
 # Phase 05 Code Review

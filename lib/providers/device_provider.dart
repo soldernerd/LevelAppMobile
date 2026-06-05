@@ -5,6 +5,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'package:inclinometer/ble/ble_manager.dart';
 import 'package:inclinometer/ble/ble_protocol.dart';
+import 'package:inclinometer/ble/mock_ble_manager.dart';
 import 'package:inclinometer/models/device_state.dart';
 
 /// Root-level provider for the BLE manager.
@@ -158,6 +159,16 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
   /// Keeps [BleManager] access out of [lib/ui/] per CLAUDE.md architecture rule.
   Future<void> sendCommand(int commandByte) async {
     await ref.read(bleManagerProvider).sendCommand(commandByte);
+  }
+
+  /// Debug-only: simulates an involuntary disconnect via [MockBleManager].
+  ///
+  /// This method encapsulates the [is MockBleManager] check so that
+  /// [lib/ui/] never needs to import [MockBleManager] directly, preserving
+  /// the architecture constraint from CLAUDE.md. No-op on non-mock managers.
+  void debugSimulateDisconnect() {
+    final mgr = ref.read(bleManagerProvider);
+    if (mgr is MockBleManager) mgr.simulateDisconnect();
   }
 }
 

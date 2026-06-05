@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inclinometer/ble/ble_protocol.dart';
-import 'package:inclinometer/ble/mock_ble_manager.dart';
 import 'package:inclinometer/models/device_state.dart';
 import 'package:inclinometer/providers/device_provider.dart';
 
@@ -59,13 +58,14 @@ class InstrumentScreen extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
           ),
           const SizedBox(width: 8),
-          // 3. Debug button — kDebugMode only; never compiled into release builds
+          // 3. Debug button — kDebugMode only; never compiled into release builds.
+          // Routes through ConnectionNotifier.debugSimulateDisconnect() to keep
+          // MockBleManager import out of lib/ui/ (CLAUDE.md architecture rule).
           if (kDebugMode) ...[
             TextButton(
-              onPressed: () {
-                final mgr = ref.read(bleManagerProvider);
-                if (mgr is MockBleManager) mgr.simulateDisconnect();
-              },
+              onPressed: () => ref
+                  .read(connectionNotifierProvider.notifier)
+                  .debugSimulateDisconnect(),
               child: const Text(
                 'Sim. Disconnect',
                 style: TextStyle(fontSize: 13, color: Colors.white70),

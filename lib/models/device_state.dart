@@ -9,6 +9,7 @@ enum ConnectionStatus {
   disconnecting,
   disconnected,
   error,
+  reconnecting,
 }
 
 /// Live angle and battery reading from the instrument.

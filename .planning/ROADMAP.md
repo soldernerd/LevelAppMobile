@@ -115,7 +115,14 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
   3. `AndroidManifest.xml` contains `BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT`, and `ACCESS_FINE_LOCATION` declarations; `build.gradle` shows `minSdkVersion 24` and `compileSdkVersion 35`
   4. iOS `Info.plist` contains a Bluetooth usage description string (inspectable in the file; no iOS runtime test required in WP1)
   5. go_router redirects the user to the scan screen if the connection state is not `connected` and they attempt to access the instrument screen directly (route guard is exercised by navigating back from the instrument screen)
-**Plans**: TBD
+**Plans**: 3 plans in 2 waves
+
+**Wave 1** *(parallel pair — no shared files)*
+- [ ] 05-01-PLAN.md — Android/iOS platform config: build.gradle.kts SDK versions + AndroidManifest.xml BLE permissions + Info.plist Bluetooth usage description
+- [ ] 05-02-PLAN.md — Add go_router + permission_handler to pubspec; add blePermissionPermanentlyDeniedProvider to device_provider.dart
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 05-03-PLAN.md — Production main.dart (ProviderContainer + GoRouter + RouterNotifier + permission check) + ScanScreen go_router navigation + inline denied banner
 
 ---
 
@@ -127,4 +134,4 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 | 2. BLE Abstraction + Mock Layer | 1/1 | Complete | 2026-06-04 |
 | 3. Riverpod Provider Layer | 3/3 | Complete   | 2026-06-05 |
 | 4. UI Screens | 0/4 | Not started | - |
-| 5. App Wiring + Platform Config | 0/0 | Not started | - |
+| 5. App Wiring + Platform Config | 0/3 | Not started | - |

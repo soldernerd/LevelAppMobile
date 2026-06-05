@@ -220,9 +220,11 @@ final _scanRevisionProvider =
 ///
 /// Watches [_scanRevisionProvider] as the rebuild trigger — incremented by
 /// [ConnectionNotifier] whenever a new device is added to the scan list.
+/// Uses ref.watch (not ref.read) on the notifier to establish a proper
+/// Riverpod dependency, avoiding stale reads if the notifier is recreated.
 final scanResultsProvider = Provider<List<ScannedDevice>>((ref) {
   ref.watch(_scanRevisionProvider); // rebuild trigger on each new scan result
-  return ref.read(connectionNotifierProvider.notifier).scannedDevices;
+  return ref.watch(connectionNotifierProvider.notifier).scannedDevices;
 });
 
 /// StreamProvider exposing live instrument data as [DeviceState?].

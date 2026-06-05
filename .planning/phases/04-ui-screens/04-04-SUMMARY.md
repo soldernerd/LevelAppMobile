@@ -108,4 +108,11 @@ None. All tests exercise real widget behavior through the MockBleManager injecti
 - [x] All instrument tests verified passing (flutter test test/ui/instrument_screen_test.dart: 9 passed)
 - [x] Full test suite (flutter test) passes — no regressions in test/ble/ or test/providers/
 
+**3. [Rule 1 - Bug] INST-01 test timed out using direct `await ble.connect()`**
+- **Found during:** Task 1 INST-01 test execution
+- **Issue:** `await ble.connect()` inside testWidgets blocked indefinitely because `Future.delayed(300ms)` in MockBleManager uses the test zone's fake timer scheduler, which doesn't advance automatically when awaited directly from outside the widget tree
+- **Fix:** Changed INST-01 to trigger navigation via the realistic UI flow: tap FAB → scan → tap device tile. Added `setSurfaceSize(1400x900)` to INST-01 since it now renders InstrumentScreen after navigation.
+- **Files modified:** `test/ui/scan_screen_test.dart`
+- **Commit:** 06dece3
+
 ## Self-Check: PASSED

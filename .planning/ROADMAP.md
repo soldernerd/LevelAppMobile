@@ -93,8 +93,17 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
   3. Angle values are displayed in a monospaced/tabular numeral font; repeated screen updates do not cause layout shift of surrounding widgets
   4. Tapping "Zero X" or "Zero Y" on the instrument screen fires the corresponding command through the provider (the mock acknowledges it; value resets or confirms in the UI)
   5. Triggering `simulateDisconnect()` (via a debug button or test) causes the instrument screen readout to visually grey out or show a disconnected badge — last values are not shown as live data
-**Plans**: TBD
-**UI hint**: yes
+**Plans**: 4 plans in 3 waves
+
+**Wave 1**
+- [ ] 04-01-PLAN.md — sendCommand addition to ConnectionNotifier + test/ui/ scaffold files
+
+**Wave 2** *(blocked on Wave 1 completion — parallel pair)*
+- [ ] 04-02-PLAN.md — ScanScreen ConsumerWidget + Phase 4 temporary main.dart
+- [ ] 04-03-PLAN.md — InstrumentScreen ConsumerWidget with stale animation + debug button
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 04-04-PLAN.md — Widget test suites for scan_screen_test.dart and instrument_screen_test.dart
 
 ### Phase 5: App Wiring + Platform Config
 **Goal**: The app boots correctly on Android with a complete main.dart, go_router navigation, runtime permission flow, and correct build.gradle SDK settings; iOS scaffold is structurally in place
@@ -117,5 +126,5 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 | 1. Data Models + Protocol Parser | 4/4 | Complete | 2026-06-04 |
 | 2. BLE Abstraction + Mock Layer | 1/1 | Complete | 2026-06-04 |
 | 3. Riverpod Provider Layer | 3/3 | Complete   | 2026-06-05 |
-| 4. UI Screens | 0/0 | Not started | - |
+| 4. UI Screens | 0/4 | Not started | - |
 | 5. App Wiring + Platform Config | 0/0 | Not started | - |

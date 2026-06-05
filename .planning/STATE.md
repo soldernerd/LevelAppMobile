@@ -76,10 +76,10 @@ Progress: [██████████] 100% (Phase 3)
 
 ## Session Continuity
 
-**Last action:** Phase 3 plan 03-03 complete — 13 new provider tests (8 + 5), 23 total tests green, flutter analyze clean — 2026-06-05
-**Resume file:** .planning/phases/03-riverpod-provider-layer/03-CONTEXT.md
+**Last action:** Phase 4 UI-SPEC approved — 6/6 dimensions passed, design contract ready for planning — 2026-06-05
+**Resume file:** .planning/phases/04-ui-screens/04-UI-SPEC.md
 **Next action:** Plan Phase 4 UI Screens
 
 ## Last Updated
 
-2026-06-05 — Phase 3 complete (3 plans, 23 tests green, flutter analyze clean)
+2026-06-05 — Phase 4 UI-SPEC approved (6/6 dimensions, 1 non-blocking flag)

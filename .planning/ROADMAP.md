@@ -75,7 +75,7 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 **Plans**: 3 plans in 3 waves
 
 **Wave 1**
-- [ ] 03-01-PLAN.md — Add reconnecting enum value + wakelock_plus dependency
+- [x] 03-01-PLAN.md — Add reconnecting enum value + wakelock_plus dependency
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 03-02-PLAN.md — ConnectionNotifier, scanResultsProvider, instrumentDataProvider
@@ -116,6 +116,6 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 |-------|----------------|--------|-----------|
 | 1. Data Models + Protocol Parser | 4/4 | Complete | 2026-06-04 |
 | 2. BLE Abstraction + Mock Layer | 1/1 | Complete | 2026-06-04 |
-| 3. Riverpod Provider Layer | 0/3 | Not started | - |
+| 3. Riverpod Provider Layer | 1/3 | In Progress|  |
 | 4. UI Screens | 0/0 | Not started | - |
 | 5. App Wiring + Platform Config | 0/0 | Not started | - |

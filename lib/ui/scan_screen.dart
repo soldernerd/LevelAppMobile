@@ -1,15 +1,24 @@
+import 'dart:io';
+
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:inclinometer/models/device_state.dart';
 import 'package:inclinometer/providers/device_provider.dart';
-import 'package:inclinometer/ui/instrument_screen.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+/// Tracks whether the BLE permission rationale flow has been triggered this
+/// session. File-scope bool so it survives ConsumerWidget rebuilds without
+/// requiring a StatefulWidget.
+bool _blePermissionsRequested = false;
 
 /// Root scan screen — shown on app launch.
 ///
 /// Displays scan state chip, a FAB to start/stop scanning, and a filtered list
 /// of discovered BLE devices (unnamed devices are hidden per SCAN-03).
-/// Navigates to [InstrumentScreen] when [connectionNotifierProvider] reaches
-/// [ConnectionStatus.connected].
+/// Navigates to /instrument via go_router when [connectionNotifierProvider]
+/// reaches [ConnectionStatus.connected].
 class ScanScreen extends ConsumerWidget {
   const ScanScreen({super.key});
 
@@ -20,17 +29,28 @@ class ScanScreen extends ConsumerWidget {
         .where((d) => d.name.isNotEmpty)
         .toList();
 
-    // Navigate to InstrumentScreen on connect (post-frame to avoid build-phase push).
-    // Guard: prev != connected prevents duplicate push when provider rebuilds
-    // while already connected (e.g. scan-revision increment triggers rebuild).
+    // Watch permanently-denied state for inline banner (D-02).
+    final permanentlyDenied = ref.watch(blePermissionPermanentlyDeniedProvider);
+
+    // Navigate to /instrument via go_router on connect (RESEARCH.md Pitfall 4).
+    // Guard: prev != connected prevents duplicate navigation when provider
+    // rebuilds while already connected (e.g. scan-revision increment).
     ref.listen(connectionNotifierProvider, (prev, next) {
       if (next == ConnectionStatus.connected &&
           prev != ConnectionStatus.connected) {
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const InstrumentScreen()),
-        );
+        context.go('/instrument');
       }
     });
+
+    // D-01: Show rationale dialog before system permission prompt on first render.
+    // addPostFrameCallback ensures we are outside the build phase when showing
+    // a dialog.
+    if (!_blePermissionsRequested) {
+      _blePermissionsRequested = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _requestBlePermissionsIfNeeded(context, ref);
+      });
+    }
 
     final isScanning = status == ConnectionStatus.scanning;
 
@@ -87,7 +107,13 @@ class ScanScreen extends ConsumerWidget {
               child: Icon(isScanning ? Icons.stop : Icons.bluetooth_searching),
             )
           : null,
-      body: _buildBody(context, ref, status, devices),
+      // D-02: Conditionally show permanently-denied banner above body.
+      body: Column(
+        children: [
+          if (permanentlyDenied) _buildPermissionDeniedBanner(),
+          Expanded(child: _buildBody(context, ref, status, devices)),
+        ],
+      ),
     );
   }
 
@@ -172,6 +198,89 @@ class ScanScreen extends ConsumerWidget {
       },
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Permission helpers (D-01, D-02)
+// ---------------------------------------------------------------------------
+
+/// Requests BLE permissions on Android with a rationale dialog shown first.
+///
+/// SDK-aware: API >= 31 uses bluetoothScan + bluetoothConnect; older APIs use
+/// bluetooth + locationWhenInUse. Writes permanentlyDenied state to
+/// [blePermissionPermanentlyDeniedProvider] if any permission comes back
+/// permanently denied.
+Future<void> _requestBlePermissionsIfNeeded(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  if (!Platform.isAndroid) return;
+
+  // Determine API level to select the correct permission set.
+  final sdkInt =
+      (await DeviceInfoPlugin().androidInfo).version.sdkInt;
+
+  final permissions = sdkInt >= 31
+      ? [Permission.bluetoothScan, Permission.bluetoothConnect]
+      : [Permission.bluetooth, Permission.locationWhenInUse];
+
+  // Skip if all permissions are already granted.
+  final statuses = await Future.wait(permissions.map((p) => p.status));
+  if (statuses.every((s) => s.isGranted)) return;
+
+  // Show rationale dialog before the system prompt (PERM-03).
+  if (!context.mounted) return;
+  await showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Bluetooth Permission'),
+      content: const Text(
+        'This app needs Bluetooth to scan for and connect to your '
+        'inclinometer instrument.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('Continue'),
+        ),
+      ],
+    ),
+  );
+
+  // Request permissions after dialog is dismissed.
+  final results = await permissions.request();
+
+  // Check for permanently denied permissions and update provider.
+  final anyPermanentlyDenied =
+      results.values.any((s) => s.isPermanentlyDenied);
+  if (anyPermanentlyDenied) {
+    ref.read(blePermissionPermanentlyDeniedProvider.notifier).state = true;
+  }
+}
+
+/// Inline banner shown when BLE permissions are permanently denied (D-02).
+///
+/// Background: Color(0xFF311B1B) — dark red tint to indicate a blocking state.
+Widget _buildPermissionDeniedBanner() {
+  return Container(
+    color: const Color(0xFF311B1B),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    child: Row(
+      children: [
+        const Expanded(
+          child: Text(
+            'Bluetooth permission is permanently denied. '
+            'Open Settings to grant access.',
+            style: TextStyle(fontSize: 13, color: Colors.white70),
+          ),
+        ),
+        TextButton(
+          onPressed: openAppSettings,
+          child: const Text('Open Settings'),
+        ),
+      ],
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------

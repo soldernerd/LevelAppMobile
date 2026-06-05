@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:inclinometer/ble/mock_ble_manager.dart';
 import 'package:inclinometer/models/device_state.dart';
@@ -20,15 +21,34 @@ class _FixedStatusNotifier extends ConnectionNotifier {
   ConnectionStatus build() => _status;
 }
 
-/// Wraps [ScanScreen] in a ProviderScope with a [MockBleManager] override.
+/// Builds a GoRouter for tests with /scan and /instrument routes.
+GoRouter _buildRouter() => GoRouter(
+      initialLocation: '/scan',
+      routes: [
+        GoRoute(
+          path: '/scan',
+          builder: (context, state) => const ScanScreen(),
+        ),
+        GoRoute(
+          path: '/instrument',
+          builder: (context, state) => const InstrumentScreen(),
+        ),
+      ],
+    );
+
+/// Wraps [ScanScreen] in a ProviderScope with a [MockBleManager] override and
+/// a GoRouter (required because ScanScreen uses context.go).
 ///
 /// Registers [ble.dispose] as a teardown so the mock's periodic ticker is
 /// cancelled before the test framework checks for pending timers.
 Widget buildHarness(MockBleManager ble) {
   addTearDown(ble.dispose);
+  final router = _buildRouter();
   return ProviderScope(
-    overrides: [bleManagerProvider.overrideWithValue(ble)],
-    child: const MaterialApp(home: ScanScreen()),
+    overrides: [
+      bleManagerProvider.overrideWithValue(ble),
+    ],
+    child: MaterialApp.router(routerConfig: router),
   );
 }
 
@@ -83,6 +103,7 @@ void main() {
     testWidgets('SCAN-03: only named devices appear in the list', (tester) async {
       final ble = MockBleManager();
       addTearDown(ble.dispose);
+      final router = _buildRouter();
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -94,7 +115,7 @@ void main() {
               ],
             ),
           ],
-          child: const MaterialApp(home: ScanScreen()),
+          child: MaterialApp.router(routerConfig: router),
         ),
       );
       await tester.pump();
@@ -117,6 +138,7 @@ void main() {
     testWidgets('SCAN-04: chip label is Scanning when scanning', (tester) async {
       final ble = MockBleManager();
       addTearDown(ble.dispose);
+      final router = _buildRouter();
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -125,7 +147,7 @@ void main() {
               () => _FixedStatusNotifier(ConnectionStatus.scanning),
             ),
           ],
-          child: const MaterialApp(home: ScanScreen()),
+          child: MaterialApp.router(routerConfig: router),
         ),
       );
       await tester.pump();
@@ -138,11 +160,12 @@ void main() {
     testWidgets('SCAN-05: tapping a device tile calls connect and transitions to Connecting',
         (tester) async {
       final ble = MockBleManager();
+      final router = _buildRouter();
       // Note: do NOT use buildHarness here — we need explicit control over ble.dispose
       // timing to avoid pending-timer assertion failures.
       await tester.pumpWidget(ProviderScope(
         overrides: [bleManagerProvider.overrideWithValue(ble)],
-        child: const MaterialApp(home: ScanScreen()),
+        child: MaterialApp.router(routerConfig: router),
       ));
       await tester.pump();
 
@@ -199,7 +222,7 @@ void main() {
 
       // Advance through the 300ms connect delay → connected.
       await tester.pump(const Duration(milliseconds: 350));
-      // Extra pump for Navigator push post-frame callback.
+      // Extra pump for go_router navigation and frame rendering.
       await tester.pump();
 
       // InstrumentScreen should now be visible — it shows a 'Disconnected' or

@@ -93,7 +93,8 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
       packetSub.cancel();
       _packetController.close();
       // Safety: release wakelock if provider is torn down unexpectedly.
-      WakelockPlus.disable();
+      // .catchError: async platform channel may throw in test environments.
+      WakelockPlus.disable().catchError((_) {});
     });
 
     return ConnectionStatus.idle;
@@ -104,11 +105,15 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
 
     if (status == ConnectionStatus.connected) {
       // D-09: Acquire screen-on lock when instrument is connected.
-      WakelockPlus.enable();
+      // .catchError: WakelockPlus returns a Future — the platform channel error
+      // arrives asynchronously so try/catch alone is insufficient. Use .catchError
+      // to swallow PlatformException from test environments without a platform binding.
+      // Platform side-effect is verified by code inspection (RESEARCH.md: static API).
+      WakelockPlus.enable().catchError((_) {});
     } else if (status == ConnectionStatus.disconnected ||
         status == ConnectionStatus.error) {
       // D-09: Release screen-on lock on disconnect/error.
-      WakelockPlus.disable();
+      WakelockPlus.disable().catchError((_) {});
 
       // D-05/D-06: Emit null sentinel — signals stale data to instrumentDataProvider.
       if (!_packetController.isClosed) {

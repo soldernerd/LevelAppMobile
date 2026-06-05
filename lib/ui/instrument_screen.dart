@@ -201,9 +201,15 @@ class _AngleRow extends StatelessWidget {
 ///
 /// Uses Unicode minus (U+2212) for negative values to match typographic convention.
 /// Example: +012.34°, −003.00°
+///
+/// Guards against non-finite values (NaN/Infinity) that [StatePacket.parse]
+/// may produce from raw BLE data, and clamps to ±999.99° so the fixed-width
+/// layout is never broken by out-of-range firmware values.
 String _formatAngle(double value) {
-  final sign = value >= 0 ? '+' : '−'; // U+2212 Unicode minus, not ASCII hyphen
-  final abs = value.abs();
+  if (!value.isFinite) return '  ---.--°';
+  final clamped = value.clamp(-999.99, 999.99);
+  final sign = clamped >= 0 ? '+' : '−'; // U+2212 Unicode minus, not ASCII hyphen
+  final abs = clamped.abs();
   // toStringAsFixed(2) on 3.0 → "3.00"; padLeft(6,'0') → "003.00" (NNN.NN)
   return '$sign${abs.toStringAsFixed(2).padLeft(6, '0')}°';
 }

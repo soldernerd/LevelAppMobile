@@ -28,16 +28,16 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 | 1 | Data Models + Protocol Parser | Complete ✓ |
 | 2 | BLE Abstraction + Mock Layer | Complete ✓ |
 | 3 | Riverpod Provider Layer | Complete ✓ |
-| 4 | UI Screens | Not Started |
-| 5 | App Wiring + Platform Config | Not Started |
+| 4 | UI Screens | Complete ✓ |
+| 5 | App Wiring + Platform Config | Verifying (human UAT pending) |
 
 ## Current Position
 
-**Active phase:** 4 — UI Screens
-**Active plan:** All 4 plans executed — pending verification
-**Status:** Phase 4 execution complete — 40 tests green, verification running
+**Active phase:** 5 — App Wiring + Platform Config
+**Active plan:** All 3 plans executed — 13/13 automated checks pass, human device verification pending
+**Status:** Phase 5 execution complete — 43 tests green, VERIFICATION.md created
 
-Progress: [██████████] 100%
+Progress: [██████████] 100% (automated)
 
 ## Performance Metrics
 
@@ -76,10 +76,10 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Last action:** Phase 4 UI-SPEC approved — 6/6 dimensions passed, design contract ready for planning — 2026-06-05
+**Last action:** Phase 5 execution complete — all 3 plans done, 43 tests green, VERIFICATION.md created — 2026-06-05
 **Resume file:** None
-**Next action:** Plan Phase 4 UI Screens
+**Next action:** Human UAT on Android device (cold-launch permission flow, permanently-denied banner, /instrument redirect), then /gsd:code-review 5 --fix for CR-01 (isPermanentlyDenied false positive on fresh install)
 
 ## Last Updated
 
-2026-06-05 — Phase 4 UI-SPEC approved (6/6 dimensions, 1 non-blocking flag)
+2026-06-05 — Phase 5 execution complete (3/3 plans, 43 tests green, human UAT pending)

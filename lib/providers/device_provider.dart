@@ -170,8 +170,15 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
   }
 
   /// Disconnects from the currently connected device.
+  ///
+  /// Sets [ConnectionStatus.error] if the underlying BLE manager throws,
+  /// consistent with [connect] and [startScan] error handling (WR-03).
   Future<void> disconnect() async {
-    await ref.read(bleManagerProvider).disconnect();
+    try {
+      await ref.read(bleManagerProvider).disconnect();
+    } catch (e) {
+      state = ConnectionStatus.error;
+    }
   }
 
   /// Sends a command byte to the instrument via [BleManager].

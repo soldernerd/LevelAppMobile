@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:inclinometer/ble/mock_ble_manager.dart';
 import 'package:inclinometer/models/device_state.dart';
 import 'package:inclinometer/providers/device_provider.dart';
+import 'package:inclinometer/ui/instrument_screen.dart';
 import 'package:inclinometer/ui/scan_screen.dart';
 
 /// A fixed-status notifier for testing specific connection states.
@@ -172,6 +173,11 @@ void main() {
   group('INST-01: InstrumentScreen is pushed after ConnectionStatus.connected', () {
     testWidgets('INST-01: navigates to InstrumentScreen on connected status',
         (tester) async {
+      // Use a wide surface to prevent RenderFlex overflow when InstrumentScreen renders
+      // its 80sp angle readout.
+      await tester.binding.setSurfaceSize(const Size(1400, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
       final ble = MockBleManager();
       await tester.pumpWidget(buildHarness(ble));
       await tester.pump();
@@ -179,18 +185,29 @@ void main() {
       // ScanScreen visible initially.
       expect(find.text('Scan'), findsOneWidget);
 
-      // Directly call connect on the mock — triggers connecting → connected.
-      await ble.connect('test-device-id');
+      // Trigger scan so device appears.
+      await tester.tap(find.byType(FloatingActionButton));
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pump();
 
-      // pump(400ms) allows the 300ms delay + status updates to propagate.
-      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('Inclinometer'), findsOneWidget);
+
+      // Tap device row — triggers connect() via connectionNotifierProvider.
+      await tester.tap(find.text('Inclinometer'));
+      // Let connecting status propagate.
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // Advance through the 300ms connect delay → connected.
+      await tester.pump(const Duration(milliseconds: 350));
       // Extra pump for Navigator push post-frame callback.
       await tester.pump();
 
-      // InstrumentScreen should be visible now.
-      expect(find.text('Inclinometer'), findsOneWidget);
+      // InstrumentScreen should now be visible — it shows a 'Disconnected' or
+      // 'Connected' chip in its AppBar (unlike ScanScreen which shows 'Idle'/'Scanning').
+      // We look for InstrumentScreen by type or check for the 'Zero X' button unique to it.
+      expect(find.byType(InstrumentScreen), findsOneWidget);
 
-      // Drain 100ms periodic ticker frames and dispose.
+      // Drain 100ms periodic ticker and dispose.
       await tester.pump(const Duration(milliseconds: 100));
       ble.dispose();
       await tester.pump();

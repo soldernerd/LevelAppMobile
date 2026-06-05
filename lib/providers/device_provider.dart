@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'package:inclinometer/ble/ble_manager.dart';
@@ -234,3 +235,10 @@ final scanResultsProvider = Provider<List<ScannedDevice>>((ref) {
 final instrumentDataProvider = StreamProvider<DeviceState?>((ref) {
   return ref.watch(connectionNotifierProvider.notifier).instrumentStream;
 });
+
+/// Whether BLE permissions are permanently denied on this device.
+///
+/// Set by main() on cold start (Android only) and updated by ScanScreen
+/// after a permission request resolves to permanentlyDenied.
+/// Watched by ScanScreen to show the inline "Open Settings" message (D-02).
+final blePermissionPermanentlyDeniedProvider = StateProvider<bool>((ref) => false);

@@ -1,5 +1,3 @@
-import 'dart:ui' show FontFeature;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,7 +26,7 @@ class InstrumentScreen extends ConsumerWidget {
     // AsyncLoading [not yet connected]. Do NOT use valueOrNull == null
     // alone — that conflates loading with disconnected (Pitfall 1).
     final isStale = dataAsync.hasValue && dataAsync.value == null;
-    final deviceState = dataAsync.valueOrNull; // DeviceState? — null during load or stale
+    final DeviceState? deviceState = dataAsync.hasValue ? dataAsync.value : null;
 
     final isActiveConnection = status == ConnectionStatus.connected ||
         status == ConnectionStatus.connecting ||

@@ -87,61 +87,54 @@ class InstrumentScreen extends ConsumerWidget {
       body: Column(
         children: [
           Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) => FittedBox(
-                fit: BoxFit.scaleDown,
-                child: SizedBox(
-                  width: constraints.maxWidth,
-                  height: constraints.maxHeight,
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AnimatedOpacity(
-                            opacity: isStale ? 0.40 : 1.0,
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeOut,
-                            child: Column(
-                              children: [
-                                _AngleRow(
-                                  label: 'X',
-                                  value: deviceState?.angleX ?? 0.0,
-                                  onZero: status == ConnectionStatus.connected
-                                      ? () => ref
-                                          .read(connectionNotifierProvider.notifier)
-                                          .sendCommand(kCmdZeroX)
-                                      : null,
-                                ),
-                                const SizedBox(height: 16),
-                                _AngleRow(
-                                  label: 'Y',
-                                  value: deviceState?.angleY ?? 0.0,
-                                  onZero: status == ConnectionStatus.connected
-                                      ? () => ref
-                                          .read(connectionNotifierProvider.notifier)
-                                          .sendCommand(kCmdZeroY)
-                                      : null,
-                                ),
-                              ],
+            child: SingleChildScrollView(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedOpacity(
+                        opacity: isStale ? 0.40 : 1.0,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
+                        child: Column(
+                          children: [
+                            _AngleRow(
+                              label: 'X',
+                              value: deviceState?.angleX ?? 0.0,
+                              onZero: status == ConnectionStatus.connected
+                                  ? () => ref
+                                      .read(connectionNotifierProvider.notifier)
+                                      .sendCommand(kCmdZeroX)
+                                  : null,
+                            ),
+                            const SizedBox(height: 16),
+                            _AngleRow(
+                              label: 'Y',
+                              value: deviceState?.angleY ?? 0.0,
+                              onZero: status == ConnectionStatus.connected
+                                  ? () => ref
+                                      .read(connectionNotifierProvider.notifier)
+                                      .sendCommand(kCmdZeroY)
+                                  : null,
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (isStale)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Text(
+                            'DISCONNECTED',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: const Color(0xFFD32F2F),
+                              letterSpacing: 1.5,
                             ),
                           ),
-                          if (isStale)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 12),
-                              child: Text(
-                                'DISCONNECTED',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: const Color(0xFFD32F2F),
-                                  letterSpacing: 1.5,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
+                        ),
+                    ],
                   ),
                 ),
               ),

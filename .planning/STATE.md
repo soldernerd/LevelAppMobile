@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-last_updated: "2026-06-05T17:37:45.288Z"
+status: complete
+last_updated: "2026-06-06T14:30:00.000Z"
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 15
-  completed_plans: 15
+  total_phases: 6
+  completed_phases: 6
+  total_plans: 16
+  completed_plans: 16
   percent: 100
 ---
 
@@ -30,14 +30,15 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 | 3 | Riverpod Provider Layer | Complete ✓ |
 | 4 | UI Screens | Complete ✓ |
 | 5 | App Wiring + Platform Config | Verifying (human UAT pending) |
+| 6 | App Icon | Complete ✓ |
 
 ## Current Position
 
-**Active phase:** 5 — App Wiring + Platform Config
-**Active plan:** All 3 plans executed — 13/13 automated checks pass, human device verification pending
-**Status:** Phase 5 execution complete — 43 tests green, VERIFICATION.md created
+**Active phase:** 6 — App Icon
+**Active plan:** 06-01 complete
+**Status:** Phase 6 execution complete — custom torpedo-level icon generated for Android + iOS
 
-Progress: [██████████] 100% (automated)
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -65,6 +66,9 @@ Progress: [██████████] 100% (automated)
 - state = state; reassignment used for scanResultsProvider rebuild trigger (ref.notifyListeners() not available in Riverpod 3.3.1 Notifier)
 - flutter_test used for provider tests to enable TestWidgetsFlutterBinding — WakelockPlus requires Flutter binding even in unit tests
 - WakelockPlus.enable/disable wrapped with .catchError (async Future) not try/catch (sync) — platform channel errors are async
+- flutter_launcher_icons 0.14.4 uses flat config format (not platforms: nested) and remove_alpha_ios (not remove_alpha_channel)
+- flutter_launcher_icons config key is flutter_launcher_icons: not the deprecated flutter_icons:
+- Torpedo-level icon is simple line-art; PNG file sizes (6KB xxxhdpi, 46KB 1024x1024) are correct for the source — plan's >10KB/>500KB thresholds were written for photo-realistic icons
 
 ### Active TODOs
 
@@ -76,10 +80,10 @@ Progress: [██████████] 100% (automated)
 
 ## Session Continuity
 
-**Last action:** Phase 5 execution complete — all 3 plans done, 43 tests green, VERIFICATION.md created — 2026-06-05
+**Last action:** Phase 6 execution complete — 1/1 plans done, custom torpedo-level icon generated for Android + iOS — 2026-06-06
 **Resume file:** None
-**Next action:** Human UAT on Android device (cold-launch permission flow, permanently-denied banner, /instrument redirect), then /gsd:code-review 5 --fix for CR-01 (isPermanentlyDenied false positive on fresh install)
+**Next action:** WP1 complete. Human UAT on Android device (icon visible on home screen, permission flow, instrument screen). WP2 = BLE wiring with RealBleManager.
 
 ## Last Updated
 
-2026-06-05 — Phase 5 execution complete (3/3 plans, 43 tests green, human UAT pending)
+2026-06-06 — Phase 6 execution complete (1/1 plans, custom icon generated, WP1 done)

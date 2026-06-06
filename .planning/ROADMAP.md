@@ -15,7 +15,7 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 - [x] **Phase 3: Riverpod Provider Layer** — Wire providers that expose connection state machine and live instrument data; no widgets yet (completed 2026-06-05)
 - [ ] **Phase 4: UI Screens** — Build scan screen and instrument screen consuming providers; all states visible and navigable
 - [x] **Phase 5: App Wiring + Platform Config** — main.dart, go_router, Android/iOS permissions, build.gradle SDK versions, wakelock (completed 2026-06-05)
-- [ ] **Phase 6: App Icon** — Add custom torpedo-level launcher icon using flutter_launcher_icons; Android adaptive icon + iOS icon generated from a single 620×620 PNG source
+- [x] **Phase 6: App Icon** — Add custom torpedo-level launcher icon using flutter_launcher_icons; Android adaptive icon + iOS icon generated from a single 620×620 PNG source (completed 2026-06-06)
 
 ---
 
@@ -138,7 +138,7 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 **Plans**: 1 plan in 1 wave
 
 **Wave 1**
-- [ ] 06-01-PLAN.md — Copy source PNG to assets/icon/, add flutter_launcher_icons dev dep + flutter_icons: config to pubspec.yaml, run dart run flutter_launcher_icons
+- [x] 06-01-PLAN.md — Copy source PNG to assets/icon/, add flutter_launcher_icons dev dep + flutter_icons: config to pubspec.yaml, run dart run flutter_launcher_icons
 
 ---
 
@@ -151,4 +151,4 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 | 3. Riverpod Provider Layer | 3/3 | Complete   | 2026-06-05 |
 | 4. UI Screens | 0/4 | Not started | - |
 | 5. App Wiring + Platform Config | 3/3 | Complete   | 2026-06-05 |
-| 6. App Icon | 0/1 | Pending | - |
+| 6. App Icon | 1/1 | Complete | 2026-06-06 |

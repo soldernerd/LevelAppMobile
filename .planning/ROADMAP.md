@@ -2,9 +2,9 @@
 
 ## Overview
 
-5 phases | 36 requirements | Horizontal-layer build order
+6 phases | 36 requirements | Horizontal-layer build order
 
-Each phase is a complete, testable technical layer. Phases 1–3 have no UI; correctness is verified through unit tests and stream inspection. Phases 4–5 produce a running app.
+Each phase is a complete, testable technical layer. Phases 1–3 have no UI; correctness is verified through unit tests and stream inspection. Phases 4–5 produce a running app. Phase 6 adds the custom launcher icon.
 
 ---
 
@@ -15,6 +15,7 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 - [x] **Phase 3: Riverpod Provider Layer** — Wire providers that expose connection state machine and live instrument data; no widgets yet (completed 2026-06-05)
 - [ ] **Phase 4: UI Screens** — Build scan screen and instrument screen consuming providers; all states visible and navigable
 - [x] **Phase 5: App Wiring + Platform Config** — main.dart, go_router, Android/iOS permissions, build.gradle SDK versions, wakelock (completed 2026-06-05)
+- [ ] **Phase 6: App Icon** — Add custom torpedo-level launcher icon using flutter_launcher_icons; Android adaptive icon + iOS icon generated from a single 620×620 PNG source
 
 ---
 
@@ -124,6 +125,21 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 **Wave 2** *(blocked on Wave 1 completion)*
 - [x] 05-03-PLAN.md — Production main.dart (ProviderContainer + GoRouter + RouterNotifier + permission check) + ScanScreen go_router navigation + inline denied banner
 
+### Phase 6: App Icon
+**Goal**: The custom torpedo-level launcher icon is visible on Android and iOS home screens; all platform sizes generated from a single 620×620 PNG source via flutter_launcher_icons with correct Android adaptive icon config
+**Depends on**: Phase 5
+**Requirements**: (none — this phase has no REQ-IDs; success is verified by observable icon on device)
+**Success Criteria** (what must be TRUE):
+  1. `flutter_launcher_icons` is added to `dev_dependencies` in `pubspec.yaml` with a `flutter_icons:` config block pointing to `assets/icon/app_icon.png`
+  2. `assets/icon/app_icon.png` exists in the Flutter project (620×620 PNG copied from LevelApp)
+  3. Running `dart run flutter_launcher_icons` succeeds without errors and overwrites all `mipmap-*` PNGs under `android/app/src/main/res/`
+  4. `android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml` exists and references an adaptive foreground/background config
+  5. iOS `AppIcon.appiconset` is populated with the generated icon set (not the Flutter default blue swirl)
+**Plans**: 1 plan in 1 wave
+
+**Wave 1**
+- [ ] 06-01-PLAN.md — Copy source PNG to assets/icon/, add flutter_launcher_icons dev dep + flutter_icons: config to pubspec.yaml, run dart run flutter_launcher_icons
+
 ---
 
 ## Progress Table
@@ -135,3 +151,4 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 | 3. Riverpod Provider Layer | 3/3 | Complete   | 2026-06-05 |
 | 4. UI Screens | 0/4 | Not started | - |
 | 5. App Wiring + Platform Config | 3/3 | Complete   | 2026-06-05 |
+| 6. App Icon | 0/1 | Pending | - |

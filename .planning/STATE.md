@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: complete
-last_updated: "2026-06-06T14:30:00.000Z"
+status: executing
+last_updated: "2026-06-07T10:04:27.632Z"
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 6
-  total_plans: 16
-  completed_plans: 16
-  percent: 100
+  total_plans: 19
+  completed_plans: 17
+  percent: 86
 ---
 
 # Project State
@@ -19,7 +19,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-04)
 
 **Core value:** A connected phone screen that shows live angle readings and lets the user zero each axis
-**Current focus:** Phase 3
+**Current focus:** Phase 07 — github-self-update
 
 ## Phase Status
 
@@ -34,11 +34,13 @@ See: .planning/PROJECT.md (updated 2026-06-04)
 
 ## Current Position
 
+Phase: 07 (github-self-update) — EXECUTING
+Plan: 2 of 3
 **Active phase:** 6 — App Icon
 **Active plan:** 06-01 complete
-**Status:** Phase 6 execution complete — custom torpedo-level icon generated for Android + iOS
+**Status:** Ready to execute
 
-Progress: [██████████] 100%
+Progress: [█████████░] 89%
 
 ## Performance Metrics
 
@@ -69,6 +71,8 @@ Progress: [██████████] 100%
 - flutter_launcher_icons 0.14.4 uses flat config format (not platforms: nested) and remove_alpha_ios (not remove_alpha_channel)
 - flutter_launcher_icons config key is flutter_launcher_icons: not the deprecated flutter_icons:
 - Torpedo-level icon is simple line-art; PNG file sizes (6KB xxxhdpi, 46KB 1024x1024) are correct for the source — plan's >10KB/>500KB thresholds were written for photo-realistic icons
+- Package T-07-SC gate resolved: using open_filex (drop-in substitute for open_file_plus) — approved by orchestrator
+- App version aligned from 1.0.0+1 to 0.1.0+1 so updater fires when a newer GitHub release is published
 
 ### Active TODOs
 
@@ -84,10 +88,10 @@ Progress: [██████████] 100%
 
 ## Session Continuity
 
-**Last action:** Phase 6 execution complete — 1/1 plans done, custom torpedo-level icon generated for Android + iOS — 2026-06-06
+**Last action:** Phase 7 Plan 1 execution complete — pubspec deps (dio, package_info_plus, shared_preferences, path_provider, open_filex) + Android FileProvider/permissions platform config — 2026-06-07
 **Resume file:** None
-**Next action:** WP1 complete. Human UAT on Android device (icon visible on home screen, permission flow, instrument screen). WP2 = BLE wiring with RealBleManager.
+**Next action:** Execute 07-02 (UpdateService + UpdateProvider implementation).
 
 ## Last Updated
 
-2026-06-06 — Phase 6 execution complete (1/1 plans, custom icon generated, WP1 done)
+2026-06-07 — Phase 7 Plan 1 execution complete (dependencies added, Android manifest + FileProvider configured)

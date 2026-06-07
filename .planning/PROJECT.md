@@ -12,7 +12,7 @@ A connected phone screen that shows live angle readings and lets the user zero e
 
 ### Validated
 
-(None yet — ship to validate)
+- [x] GitHub self-update — validated in Phase 7 (automated checks passed; device UAT pending)
 
 ### Active
 
@@ -77,4 +77,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-04 after initialization*
+*Last updated: 2026-06-07 — Phase 7 complete (GitHub self-update, all 7 phases shipped)*

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:inclinometer/models/device_state.dart';
 import 'package:inclinometer/providers/device_provider.dart';
 import 'package:inclinometer/providers/update_provider.dart';
+import 'package:inclinometer/providers/version_provider.dart';
 import 'package:inclinometer/services/update_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -46,6 +47,9 @@ class ScanScreen extends ConsumerWidget {
 
     // Watch permanently-denied state for inline banner (D-02).
     final permanentlyDenied = ref.watch(blePermissionPermanentlyDeniedProvider);
+
+    // Version string stamped by the build system — empty while loading.
+    final version = ref.watch(versionProvider).asData?.value ?? '';
 
     // Navigate to /instrument via go_router on connect (RESEARCH.md Pitfall 4).
     // Guard: prev != connected prevents duplicate navigation when provider
@@ -145,6 +149,14 @@ class ScanScreen extends ConsumerWidget {
         children: [
           if (permanentlyDenied) _buildPermissionDeniedBanner(),
           Expanded(child: _buildBody(context, ref, status, devices)),
+          if (version.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                version,
+                style: const TextStyle(fontSize: 11, color: Colors.white24),
+              ),
+            ),
         ],
       ),
     );

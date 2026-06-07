@@ -10,6 +10,7 @@ import 'package:inclinometer/ble/mock_ble_manager.dart';
 import 'package:inclinometer/models/device_state.dart';
 import 'package:inclinometer/providers/device_provider.dart';
 import 'package:inclinometer/providers/update_provider.dart';
+import 'package:inclinometer/providers/version_provider.dart';
 import 'package:inclinometer/services/update_service.dart';
 import 'package:inclinometer/ui/instrument_screen.dart';
 import 'package:inclinometer/ui/scan_screen.dart';
@@ -57,9 +58,9 @@ Widget buildHarness(
     overrides: [
       bleManagerProvider.overrideWithValue(ble),
       // Always override updateCheckProvider to prevent network calls in tests.
-      updateCheckProvider.overrideWith(
-        (ref) async => updateResult,
-      ),
+      updateCheckProvider.overrideWith((ref) async => updateResult),
+      // Override versionProvider to avoid platform channel calls in tests.
+      versionProvider.overrideWith((ref) async => 'v0.0.0-test'),
     ],
     child: MaterialApp.router(routerConfig: router),
   );
@@ -122,6 +123,7 @@ void main() {
           overrides: [
             bleManagerProvider.overrideWithValue(ble),
             updateCheckProvider.overrideWith((ref) async => null),
+            versionProvider.overrideWith((ref) async => 'v0.0.0-test'),
             scanResultsProvider.overrideWith(
               (ref) => [
                 const ScannedDevice(id: 'id1', name: '', rssi: -70),
@@ -158,6 +160,7 @@ void main() {
           overrides: [
             bleManagerProvider.overrideWithValue(ble),
             updateCheckProvider.overrideWith((ref) async => null),
+            versionProvider.overrideWith((ref) async => 'v0.0.0-test'),
             connectionNotifierProvider.overrideWith(
               () => _FixedStatusNotifier(ConnectionStatus.scanning),
             ),
@@ -182,6 +185,7 @@ void main() {
         overrides: [
           bleManagerProvider.overrideWithValue(ble),
           updateCheckProvider.overrideWith((ref) async => null),
+          versionProvider.overrideWith((ref) async => 'v0.0.0-test'),
         ],
         child: MaterialApp.router(routerConfig: router),
       ));
@@ -237,6 +241,7 @@ void main() {
                 version: '9.9.9',
               ),
             ),
+            versionProvider.overrideWith((ref) async => 'v0.0.0-test'),
           ],
           child: MaterialApp.router(routerConfig: router),
         ),
@@ -276,6 +281,7 @@ void main() {
                 version: '9.9.9',
               ),
             ),
+            versionProvider.overrideWith((ref) async => 'v0.0.0-test'),
           ],
           child: MaterialApp.router(routerConfig: router),
         ),

@@ -13,6 +13,7 @@ import 'package:inclinometer/providers/update_provider.dart';
 import 'package:inclinometer/services/update_service.dart';
 import 'package:inclinometer/ui/instrument_screen.dart';
 import 'package:inclinometer/ui/scan_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// A fixed-status notifier for testing specific connection states.
 class _FixedStatusNotifier extends ConnectionNotifier {
@@ -214,6 +215,8 @@ void main() {
     setUp(() {
       // Reset file-scope guard so the dialog can appear in each test run.
       resetUpdateDialogShownForTest();
+      // Clean in-memory SharedPreferences store (needed for Skip tests).
+      SharedPreferences.setMockInitialValues({});
     });
 
     testWidgets(
@@ -253,6 +256,56 @@ void main() {
 
       // "Skip" action button must also be present.
       expect(find.widgetWithText(TextButton, 'Skip'), findsOneWidget);
+    });
+
+    testWidgets(
+        'UPD-02: tapping Skip dismisses the dialog and persists the skipped tag',
+        (tester) async {
+      final ble = MockBleManager();
+      addTearDown(ble.dispose);
+      final router = _buildRouter();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            bleManagerProvider.overrideWithValue(ble),
+            updateCheckProvider.overrideWith(
+              (ref) async => const UpdateInfo(
+                tagName: 'v9.9.9',
+                downloadUrl: 'https://example.com/app-release.apk',
+                version: '9.9.9',
+              ),
+            ),
+          ],
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+
+      // Let FutureProvider resolve and dialog appear.
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+
+      // Tap Skip.
+      await tester.tap(find.widgetWithText(TextButton, 'Skip'));
+      await tester.pumpAndSettle();
+
+      // Dialog must be gone.
+      expect(find.byType(AlertDialog), findsNothing);
+
+      // SharedPreferences must record the skipped tag (D-03/D-04).
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('skipped_update_version'), equals('v9.9.9'));
+    });
+
+    testWidgets('UPD-02: no dialog when update result is null (up-to-date)',
+        (tester) async {
+      final ble = MockBleManager();
+      await tester.pumpWidget(buildHarness(ble));
+
+      // buildHarness defaults updateResult to null — simulate up-to-date.
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
     });
   });
 

@@ -6,12 +6,17 @@ on:
   pull_request:
     branches: ["**"]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history needed for git rev-list --count
 
       - uses: subosito/flutter-action@v2
         with:
@@ -26,5 +31,45 @@ jobs:
       - name: Test
         run: flutter test
 
-      - name: Build debug APK
-        run: flutter build apk --debug
+      # ── Release steps (push to main only) ────────────────────────────────
+      # Version: 0.1.<commit-count>  e.g. v0.1.47
+      # --build-name embeds the version in the APK so PackageInfo returns it,
+      # which allows the self-update check to compare correctly.
+
+      - name: Compute version tag
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: ver
+        run: |
+          COUNT=$(git rev-list --count HEAD)
+          echo "name=0.1.${COUNT}" >> "$GITHUB_OUTPUT"
+          echo "tag=v0.1.${COUNT}"  >> "$GITHUB_OUTPUT"
+
+      - name: Decode keystore
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+
+      - name: Write key.properties
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=upload-keystore.jks\n' \
+            "${{ secrets.KEYSTORE_PASSWORD }}" \
+            "${{ secrets.KEY_PASSWORD }}" \
+            "${{ secrets.KEY_ALIAS }}" \
+            > android/key.properties
+
+      - name: Build release APK
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          COUNT=$(git rev-list --count HEAD)
+          flutter build apk --release \
+            --build-name="0.1.${COUNT}" \
+            --build-number="${COUNT}"
+
+      - name: Create GitHub release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
+          generate_release_notes: true
+          files: build/app/outputs/flutter-apk/app-release.apk

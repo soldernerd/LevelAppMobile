@@ -16,7 +16,7 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 - [ ] **Phase 4: UI Screens** — Build scan screen and instrument screen consuming providers; all states visible and navigable
 - [x] **Phase 5: App Wiring + Platform Config** — main.dart, go_router, Android/iOS permissions, build.gradle SDK versions, wakelock (completed 2026-06-05)
 - [x] **Phase 6: App Icon** — Add custom torpedo-level launcher icon using flutter_launcher_icons; Android adaptive icon + iOS icon generated from a single 620×620 PNG source (completed 2026-06-06)
-- [ ] **Phase 7: GitHub Self-Update** — App checks GitHub Releases on startup and offers to download + install the latest APK automatically, completing the CI/CD loop
+- [x] **Phase 7: GitHub Self-Update** — App checks GitHub Releases on startup and offers to download + install the latest APK automatically, completing the CI/CD loop (completed 2026-06-07)
 
 ---
 
@@ -161,7 +161,7 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 - [x] 07-02-PLAN.md — UpdateService (GitHub API check, integer-segment version compare, dio download with progress, REQUEST_INSTALL_PACKAGES runtime check, installer launch) + unit tests
 
 **Wave 3** *(blocked on Wave 2 completion)*
-- [ ] 07-03-PLAN.md — updateCheckProvider FutureProvider + ScanScreen update dialog (Skip persists / Update downloads with progress) + widget test
+- [x] 07-03-PLAN.md — updateCheckProvider FutureProvider + ScanScreen update dialog (Skip persists / Update downloads with progress) + widget test
 
 ---
 
@@ -175,4 +175,4 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 | 4. UI Screens | 0/4 | Not started | - |
 | 5. App Wiring + Platform Config | 3/3 | Complete   | 2026-06-05 |
 | 6. App Icon | 1/1 | Complete | 2026-06-06 |
-| 7. GitHub Self-Update | 2/3 | In Progress|  |
+| 7. GitHub Self-Update | 3/3 | Complete   | 2026-06-07 |

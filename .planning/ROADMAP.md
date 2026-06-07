@@ -158,7 +158,7 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 - [x] 07-01-PLAN.md — Add dio/package_info_plus/shared_preferences/path_provider/open_file_plus deps + version alignment (0.1.0+1); AndroidManifest REQUEST_INSTALL_PACKAGES + INTERNET + FileProvider; filepaths.xml (incl. package legitimacy checkpoint)
 
 **Wave 2** *(blocked on Wave 1 completion)*
-- [ ] 07-02-PLAN.md — UpdateService (GitHub API check, integer-segment version compare, dio download with progress, REQUEST_INSTALL_PACKAGES runtime check, installer launch) + unit tests
+- [x] 07-02-PLAN.md — UpdateService (GitHub API check, integer-segment version compare, dio download with progress, REQUEST_INSTALL_PACKAGES runtime check, installer launch) + unit tests
 
 **Wave 3** *(blocked on Wave 2 completion)*
 - [ ] 07-03-PLAN.md — updateCheckProvider FutureProvider + ScanScreen update dialog (Skip persists / Update downloads with progress) + widget test
@@ -175,4 +175,4 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 | 4. UI Screens | 0/4 | Not started | - |
 | 5. App Wiring + Platform Config | 3/3 | Complete   | 2026-06-05 |
 | 6. App Icon | 1/1 | Complete | 2026-06-06 |
-| 7. GitHub Self-Update | 1/3 | In Progress|  |
+| 7. GitHub Self-Update | 2/3 | In Progress|  |

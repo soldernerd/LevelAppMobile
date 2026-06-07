@@ -152,7 +152,16 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
   4. After a successful download the Android package installer launches and presents the standard install prompt
   5. When the device has no internet connection or the GitHub API is unreachable the update check fails silently — no crash, no error dialog
   6. `REQUEST_INSTALL_PACKAGES` is declared in `AndroidManifest.xml`; the app requests the permission at runtime on Android 8+ (API 26+) before attempting installation
-**Plans**: TBD
+**Plans**: 3 plans in 3 waves
+
+**Wave 1**
+- [ ] 07-01-PLAN.md — Add dio/package_info_plus/shared_preferences/path_provider/open_file_plus deps + version alignment (0.1.0+1); AndroidManifest REQUEST_INSTALL_PACKAGES + INTERNET + FileProvider; filepaths.xml (incl. package legitimacy checkpoint)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 07-02-PLAN.md — UpdateService (GitHub API check, integer-segment version compare, dio download with progress, REQUEST_INSTALL_PACKAGES runtime check, installer launch) + unit tests
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 07-03-PLAN.md — updateCheckProvider FutureProvider + ScanScreen update dialog (Skip persists / Update downloads with progress) + widget test
 
 ---
 
@@ -166,4 +175,4 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 | 4. UI Screens | 0/4 | Not started | - |
 | 5. App Wiring + Platform Config | 3/3 | Complete   | 2026-06-05 |
 | 6. App Icon | 1/1 | Complete | 2026-06-06 |
-| 7. GitHub Self-Update | 0/? | Not started | - |
+| 7. GitHub Self-Update | 0/3 | Not started | - |

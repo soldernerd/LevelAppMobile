@@ -6,12 +6,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:inclinometer/models/device_state.dart';
 import 'package:inclinometer/providers/device_provider.dart';
+import 'package:inclinometer/providers/update_provider.dart';
+import 'package:inclinometer/services/update_service.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 /// Tracks whether the BLE permission rationale flow has been triggered this
 /// session. File-scope bool so it survives ConsumerWidget rebuilds without
 /// requiring a StatefulWidget.
 bool _blePermissionsRequested = false;
+
+/// Tracks whether the update dialog has been shown this session.
+///
+/// File-scope bool (mirrors [_blePermissionsRequested]) — prevents duplicate
+/// dialogs when the updateCheckProvider rebuilds or the widget rebuilds while
+/// the dialog is already on screen (T-07-08 DoS mitigation from threat model).
+bool _updateDialogShown = false;
 
 /// Root scan screen — shown on app launch.
 ///
@@ -41,6 +50,23 @@ class ScanScreen extends ConsumerWidget {
         context.go('/instrument');
       }
     });
+
+    // UPD-02: React to the cold-start update check result.
+    // ref.listen (not ref.watch) so the widget does not rebuild on state change.
+    // addPostFrameCallback defers showDialog out of the build phase (Pitfall 2).
+    // _updateDialogShown guard prevents duplicate dialogs on provider rebuild.
+    ref.listen<AsyncValue<UpdateInfo?>>(
+      updateCheckProvider,
+      (_, next) {
+        next.whenData((info) {
+          if (info == null || _updateDialogShown) return;
+          _updateDialogShown = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) _showUpdateDialog(context, ref, info);
+          });
+        });
+      },
+    );
 
     // D-01: Show rationale dialog before system permission prompt on first render.
     // addPostFrameCallback ensures we are outside the build phase when showing
@@ -281,6 +307,106 @@ Widget _buildPermissionDeniedBanner() {
       ],
     ),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Update dialog (UPD-02, UPD-03, D-03/D-04)
+// ---------------------------------------------------------------------------
+
+/// Shows a one-time dialog when a newer GitHub release is available.
+///
+/// Presents [info.version] to the user with two actions:
+/// - **Skip** — persists the tag via [UpdateService.skipVersion] so the dialog
+///   never re-appears for this release (D-03/D-04), then dismisses.
+/// - **Update** — downloads the APK with a live [LinearProgressIndicator] then
+///   launches the Android package installer (UPD-03).
+///
+/// All errors during download/install are swallowed (fail-quiet posture, UPD-05).
+/// No platform/HTTP imports are used here — all I/O stays in [UpdateService]
+/// per the CLAUDE.md ARCH-02 architecture boundary.
+Future<void> _showUpdateDialog(
+  BuildContext context,
+  WidgetRef ref,
+  UpdateInfo info,
+) async {
+  // ValueNotifier drives download progress inside the dialog without requiring
+  // a StatefulWidget. Values: 0.0 = not started / indeterminate; 0.0<x≤1.0 = progress.
+  final progressNotifier = ValueNotifier<double>(0.0);
+  // Tracks whether download has started (switches content to progress view).
+  final downloadingNotifier = ValueNotifier<bool>(false);
+
+  await showDialog<void>(
+    context: context,
+    barrierDismissible: false, // force explicit Skip or Update action
+    builder: (ctx) => ValueListenableBuilder<bool>(
+      valueListenable: downloadingNotifier,
+      builder: (_, isDownloading, child) {
+        if (isDownloading) {
+          // Download in progress — show progress indicator.
+          return AlertDialog(
+            title: const Text('Downloading update…'),
+            content: ValueListenableBuilder<double>(
+              valueListenable: progressNotifier,
+              builder: (_, progress, child) => Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  progress > 0
+                      ? LinearProgressIndicator(value: progress)
+                      : const LinearProgressIndicator(), // indeterminate
+                  const SizedBox(height: 8),
+                  Text(
+                    progress > 0
+                        ? '${(progress * 100).toStringAsFixed(0)}%'
+                        : 'Downloading…',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // Pre-download — offer Skip / Update choice.
+        return AlertDialog(
+          title: const Text('Update available'),
+          content: Text(
+            'Version ${info.version} is available. Would you like to download '
+            'and install it now?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                // D-03/D-04: persist skip so this version never re-prompts.
+                await UpdateService.skipVersion(info.tagName);
+                if (ctx.mounted) Navigator.of(ctx).pop();
+              },
+              child: const Text('Skip'),
+            ),
+            TextButton(
+              onPressed: () async {
+                downloadingNotifier.value = true;
+                try {
+                  final path = await UpdateService.downloadApk(
+                    info.downloadUrl,
+                    (p) => progressNotifier.value = p,
+                  );
+                  await UpdateService.installApk(path);
+                } catch (_) {
+                  // UPD-05: fail-quiet — close dialog silently on any error.
+                } finally {
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                }
+              },
+              child: const Text('Update'),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+
+  progressNotifier.dispose();
+  downloadingNotifier.dispose();
 }
 
 // ---------------------------------------------------------------------------

@@ -642,19 +642,19 @@ UpdateService.downloadApk(info.downloadUrl, (p) => _progress.value = p)
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **`pubspec.yaml` version alignment**
+1. **`pubspec.yaml` version alignment** — RESOLVED: 07-01 Task 2 bumps `pubspec.yaml` version from `1.0.0+1` to `0.1.0+1`, aligning with the current GitHub release `v0.1.0`. Any future release `v0.1.1+` will trigger the updater correctly.
    - What we know: Current `pubspec.yaml` has `version: 1.0.0+1`; latest GitHub release is `v0.1.0` (`tag_name`). `1.0.0 > 0.1.0` so the installed build always looks "ahead of" the release.
    - What's unclear: Should `pubspec.yaml` be downgraded to `0.1.0+1` to match, or should the next release be tagged `v1.0.0`? This is a deployment decision, not a code decision.
    - Recommendation: The planner should include a task to bump `pubspec.yaml` version to match the intended next release tag (or document the alignment rule) before Phase 7 is considered complete.
 
-2. **Download progress when Content-Length is absent**
+2. **Download progress when Content-Length is absent** — RESOLVED: 07-02 Task 2 guards with `if (total > 0)` before computing progress; falls back to `CircularProgressIndicator` (indeterminate) when `total == -1`.
    - What we know: GitHub CDN usually includes `Content-Length` for release assets; confirmed `size: 48762701` in the live API response.
    - What's unclear: Whether the CDN redirect chain preserves the header for all clients (VPN, proxy, etc.).
    - Recommendation: Guard with `if (total > 0)` and show `CircularProgressIndicator` (indeterminate) when `total == -1`; show `LinearProgressIndicator(value: progress)` otherwise.
 
-3. **Partial download cleanup**
+3. **Partial download cleanup** — RESOLVED: 07-02 Task 2 explicitly passes `deleteOnError: true` to `dio.download()` and wraps in try/finally with manual file deletion on catch.
    - What we know: `dio.download()` has `deleteOnError: true` by default, which removes the partial file on exception.
    - What's unclear: Whether the default is reliable across all Dio 5.x versions or needs to be explicitly set.
    - Recommendation: Pass `deleteOnError: true` explicitly for clarity; also wrap in try/finally and delete in the catch to be safe.

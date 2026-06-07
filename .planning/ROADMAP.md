@@ -16,6 +16,7 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 - [ ] **Phase 4: UI Screens** — Build scan screen and instrument screen consuming providers; all states visible and navigable
 - [x] **Phase 5: App Wiring + Platform Config** — main.dart, go_router, Android/iOS permissions, build.gradle SDK versions, wakelock (completed 2026-06-05)
 - [x] **Phase 6: App Icon** — Add custom torpedo-level launcher icon using flutter_launcher_icons; Android adaptive icon + iOS icon generated from a single 620×620 PNG source (completed 2026-06-06)
+- [ ] **Phase 7: GitHub Self-Update** — App checks GitHub Releases on startup and offers to download + install the latest APK automatically, completing the CI/CD loop
 
 ---
 
@@ -140,6 +141,19 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 **Wave 1**
 - [x] 06-01-PLAN.md — Copy source PNG to assets/icon/, add flutter_launcher_icons dev dep + flutter_icons: config to pubspec.yaml, run dart run flutter_launcher_icons
 
+### Phase 7: GitHub Self-Update
+**Goal**: The app checks GitHub Releases on startup, compares the release tag against the installed version, and offers to download + install the latest APK — completing the CI/CD loop so users always run the current build
+**Depends on**: Phase 5 (App Wiring)
+**Requirements**: UPD-01, UPD-02, UPD-03, UPD-04, UPD-05, UPD-06
+**Success Criteria** (what must be TRUE):
+  1. On startup the app calls `https://api.github.com/repos/{owner}/{repo}/releases/latest` and compares `tag_name` (semver) against the version from `PackageInfo.fromPlatform()`
+  2. When a newer version is detected an update dialog appears showing the new version number; the user can dismiss (skip this session) or proceed
+  3. Tapping "Update" downloads the APK from the release's `assets[].browser_download_url` with a visible progress indicator (percentage or progress bar)
+  4. After a successful download the Android package installer launches and presents the standard install prompt
+  5. When the device has no internet connection or the GitHub API is unreachable the update check fails silently — no crash, no error dialog
+  6. `REQUEST_INSTALL_PACKAGES` is declared in `AndroidManifest.xml`; the app requests the permission at runtime on Android 8+ (API 26+) before attempting installation
+**Plans**: TBD
+
 ---
 
 ## Progress Table
@@ -152,3 +166,4 @@ Each phase is a complete, testable technical layer. Phases 1–3 have no UI; cor
 | 4. UI Screens | 0/4 | Not started | - |
 | 5. App Wiring + Platform Config | 3/3 | Complete   | 2026-06-05 |
 | 6. App Icon | 1/1 | Complete | 2026-06-06 |
+| 7. GitHub Self-Update | 0/? | Not started | - |

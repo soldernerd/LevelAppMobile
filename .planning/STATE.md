@@ -74,6 +74,10 @@ Progress: [██████████] 100%
 
 - (none yet)
 
+### Roadmap Evolution
+
+- Phase 7 added: GitHub Self-Update — app checks GitHub Releases on startup and offers to download + install latest APK
+
 ### Blockers
 
 - (none)

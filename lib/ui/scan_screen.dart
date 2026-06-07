@@ -22,6 +22,12 @@ bool _blePermissionsRequested = false;
 /// the dialog is already on screen (T-07-08 DoS mitigation from threat model).
 bool _updateDialogShown = false;
 
+/// Resets [_updateDialogShown] to false between widget tests.
+///
+/// Only exported for testing — do not call in production code.
+@visibleForTesting
+void resetUpdateDialogShownForTest() => _updateDialogShown = false;
+
 /// Root scan screen — shown on app launch.
 ///
 /// Displays scan state chip, a FAB to start/stop scanning, and a filtered list

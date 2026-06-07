@@ -9,6 +9,8 @@ import 'package:go_router/go_router.dart';
 import 'package:inclinometer/ble/mock_ble_manager.dart';
 import 'package:inclinometer/models/device_state.dart';
 import 'package:inclinometer/providers/device_provider.dart';
+import 'package:inclinometer/providers/update_provider.dart';
+import 'package:inclinometer/services/update_service.dart';
 import 'package:inclinometer/ui/instrument_screen.dart';
 import 'package:inclinometer/ui/scan_screen.dart';
 
@@ -41,12 +43,22 @@ GoRouter _buildRouter() => GoRouter(
 ///
 /// Registers [ble.dispose] as a teardown so the mock's periodic ticker is
 /// cancelled before the test framework checks for pending timers.
-Widget buildHarness(MockBleManager ble) {
+///
+/// [updateResult] overrides [updateCheckProvider] — defaults to null (no update
+/// available) to prevent Dio network calls in non-update tests.
+Widget buildHarness(
+  MockBleManager ble, {
+  UpdateInfo? updateResult,
+}) {
   addTearDown(ble.dispose);
   final router = _buildRouter();
   return ProviderScope(
     overrides: [
       bleManagerProvider.overrideWithValue(ble),
+      // Always override updateCheckProvider to prevent network calls in tests.
+      updateCheckProvider.overrideWith(
+        (ref) async => updateResult,
+      ),
     ],
     child: MaterialApp.router(routerConfig: router),
   );
@@ -108,6 +120,7 @@ void main() {
         ProviderScope(
           overrides: [
             bleManagerProvider.overrideWithValue(ble),
+            updateCheckProvider.overrideWith((ref) async => null),
             scanResultsProvider.overrideWith(
               (ref) => [
                 const ScannedDevice(id: 'id1', name: '', rssi: -70),
@@ -143,6 +156,7 @@ void main() {
         ProviderScope(
           overrides: [
             bleManagerProvider.overrideWithValue(ble),
+            updateCheckProvider.overrideWith((ref) async => null),
             connectionNotifierProvider.overrideWith(
               () => _FixedStatusNotifier(ConnectionStatus.scanning),
             ),
@@ -164,7 +178,10 @@ void main() {
       // Note: do NOT use buildHarness here — we need explicit control over ble.dispose
       // timing to avoid pending-timer assertion failures.
       await tester.pumpWidget(ProviderScope(
-        overrides: [bleManagerProvider.overrideWithValue(ble)],
+        overrides: [
+          bleManagerProvider.overrideWithValue(ble),
+          updateCheckProvider.overrideWith((ref) async => null),
+        ],
         child: MaterialApp.router(routerConfig: router),
       ));
       await tester.pump();
@@ -190,6 +207,52 @@ void main() {
       // Dispose mock to cancel the periodic ticker before test ends.
       ble.dispose();
       await tester.pump();
+    });
+  });
+
+  group('UPD-02: Update dialog', () {
+    setUp(() {
+      // Reset file-scope guard so the dialog can appear in each test run.
+      resetUpdateDialogShownForTest();
+    });
+
+    testWidgets(
+        'UPD-02: dialog appears naming the new version when an update is available',
+        (tester) async {
+      final ble = MockBleManager();
+      addTearDown(ble.dispose);
+      final router = _buildRouter();
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            bleManagerProvider.overrideWithValue(ble),
+            updateCheckProvider.overrideWith(
+              (ref) async => const UpdateInfo(
+                tagName: 'v9.9.9',
+                downloadUrl: 'https://example.com/app-release.apk',
+                version: '9.9.9',
+              ),
+            ),
+          ],
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+
+      // Let FutureProvider resolve and the post-frame dialog callback fire.
+      await tester.pumpAndSettle();
+
+      // AlertDialog must be present.
+      expect(find.byType(AlertDialog), findsOneWidget);
+
+      // Dialog content must name the new version.
+      expect(find.textContaining('9.9.9'), findsAtLeastNWidgets(1));
+
+      // "Update" action button must be present.
+      expect(find.widgetWithText(TextButton, 'Update'), findsOneWidget);
+
+      // "Skip" action button must also be present.
+      expect(find.widgetWithText(TextButton, 'Skip'), findsOneWidget);
     });
   });
 

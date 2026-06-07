@@ -66,9 +66,10 @@ class ScanScreen extends ConsumerWidget {
       (_, next) {
         next.whenData((info) {
           if (info == null || _updateDialogShown) return;
-          _updateDialogShown = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.mounted) _showUpdateDialog(context, ref, info);
+            if (!context.mounted) return;
+            _updateDialogShown = true;
+            _showUpdateDialog(context, ref, info);
           });
         });
       },
@@ -391,15 +392,19 @@ Future<void> _showUpdateDialog(
             TextButton(
               onPressed: () async {
                 downloadingNotifier.value = true;
+                bool dialogStillOpen = true;
                 try {
                   final path = await UpdateService.downloadApk(
                     info.downloadUrl,
-                    (p) => progressNotifier.value = p,
+                    (p) {
+                      if (dialogStillOpen) progressNotifier.value = p;
+                    },
                   );
                   await UpdateService.installApk(path);
                 } catch (_) {
                   // UPD-05: fail-quiet — close dialog silently on any error.
                 } finally {
+                  dialogStillOpen = false;
                   if (ctx.mounted) Navigator.of(ctx).pop();
                 }
               },
@@ -410,9 +415,6 @@ Future<void> _showUpdateDialog(
       },
     ),
   );
-
-  progressNotifier.dispose();
-  downloadingNotifier.dispose();
 }
 
 // ---------------------------------------------------------------------------

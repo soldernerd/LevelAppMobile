@@ -56,6 +56,7 @@ class UpdateService {
         _apiUrl,
         options: Options(
           headers: {'User-Agent': 'soldernerd-inclinometer'},
+          connectTimeout: const Duration(seconds: 10),
           receiveTimeout: const Duration(seconds: 10),
           sendTimeout: const Duration(seconds: 10),
         ),
@@ -67,7 +68,7 @@ class UpdateService {
           : response.data as Map<String, dynamic>;
 
       final tagName = data['tag_name'] as String; // e.g. "v0.1.1"
-      final remoteVer = tagName.replaceFirst('v', ''); // "0.1.1"
+      final remoteVer = tagName.startsWith('v') ? tagName.substring(1) : tagName;
 
       final packageInfo = await PackageInfo.fromPlatform();
       final localVer = packageInfo.version; // e.g. "0.1.0"
@@ -108,7 +109,9 @@ class UpdateService {
     void Function(double progress) onProgress,
   ) async {
     final dir = await getTemporaryDirectory();
-    final savePath = '${dir.path}/$_apkAssetName';
+    final apkDir = Directory('${dir.path}/apk_downloads');
+    await apkDir.create(recursive: true);
+    final savePath = '${apkDir.path}/$_apkAssetName';
     final dio = Dio();
     await dio.download(
       url,

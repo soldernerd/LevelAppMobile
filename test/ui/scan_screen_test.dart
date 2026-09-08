@@ -100,7 +100,7 @@ void main() {
       await tester.pumpWidget(buildHarness(ble));
       await tester.pump();
 
-      // Start scanning — MockBleManager emits named 'Inclinometer' after 500 ms.
+      // Start scanning — MockBleManager emits named 'Leveltronic-EEFF' after 500 ms.
       await tester.tap(find.byType(FloatingActionButton));
       // Advance past the 500ms scan timer so the device is emitted.
       await tester.pump(const Duration(milliseconds: 600));
@@ -108,7 +108,7 @@ void main() {
       await tester.pump();
 
       expect(find.byType(ListTile), findsOneWidget);
-      expect(find.text('Inclinometer'), findsOneWidget);
+      expect(find.text('Leveltronic-EEFF'), findsOneWidget);
       expect(find.text('-65 dBm'), findsOneWidget);
     });
   });
@@ -196,10 +196,10 @@ void main() {
       await tester.pump(const Duration(milliseconds: 600));
       await tester.pump(); // Extra frame for Riverpod scanResultsProvider rebuild.
 
-      expect(find.text('Inclinometer'), findsOneWidget);
+      expect(find.text('Leveltronic-EEFF'), findsOneWidget);
 
       // Tap device row — triggers connect().
-      await tester.tap(find.text('Inclinometer'));
+      await tester.tap(find.text('Leveltronic-EEFF'));
       // Pump to deliver connecting status from stream.
       await tester.pump(const Duration(milliseconds: 50));
 
@@ -335,10 +335,10 @@ void main() {
       await tester.pump(const Duration(milliseconds: 600));
       await tester.pump();
 
-      expect(find.text('Inclinometer'), findsOneWidget);
+      expect(find.text('Leveltronic-EEFF'), findsOneWidget);
 
       // Tap device row — triggers connect() via connectionNotifierProvider.
-      await tester.tap(find.text('Inclinometer'));
+      await tester.tap(find.text('Leveltronic-EEFF'));
       // Let connecting status propagate.
       await tester.pump(const Duration(milliseconds: 50));
 

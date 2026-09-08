@@ -2,18 +2,20 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:inclinometer/ble/ble_protocol.dart';
+import 'package:inclinometer/ble/api_v2.dart';
 import 'package:inclinometer/models/device_state.dart';
 import 'package:inclinometer/providers/device_provider.dart';
 
-/// Full InstrumentScreen shown after a successful BLE connection.
+/// Instrument screen shown after a successful BLE connection.
 ///
-/// Displays angle X/Y readouts at 80sp with tabular figures, a connection
-/// chip, battery indicator, Zero buttons, stale-data animation, and a
-/// debug "Sim. Disconnect" button (kDebugMode only).
+/// Shows the live measurements this firmware build actually exposes —
+/// battery voltage / state, on-board + external + ambient temperature,
+/// humidity and pressure — plus a tilt placeholder (REV B has no angle
+/// output yet). Values grey out and a DISCONNECTED badge appears when the
+/// data goes stale.
 ///
-/// Architecture: no flutter_blue_plus import (CLAUDE.md). All BLE actions
-/// go through [connectionNotifierProvider.notifier].
+/// Architecture: no `flutter_blue_plus` import here. All BLE actions go
+/// through [connectionNotifierProvider.notifier].
 class InstrumentScreen extends ConsumerWidget {
   const InstrumentScreen({super.key});
 
@@ -22,8 +24,6 @@ class InstrumentScreen extends ConsumerWidget {
     final status = ref.watch(connectionNotifierProvider);
     final dataAsync = ref.watch(instrumentDataProvider);
 
-    // Navigate back to /scan on disconnect or error (D-04: no refreshListenable,
-    // so we handle post-disconnect navigation imperatively here instead).
     ref.listen(connectionNotifierProvider, (prev, next) {
       if (next == ConnectionStatus.disconnected ||
           next == ConnectionStatus.error) {
@@ -31,11 +31,10 @@ class InstrumentScreen extends ConsumerWidget {
       }
     });
 
-    // CRITICAL: hasValue distinguishes AsyncData(null) [stale] from
-    // AsyncLoading [not yet connected]. Do NOT use valueOrNull == null
-    // alone — that conflates loading with disconnected (Pitfall 1).
+    // hasValue distinguishes AsyncData(null) [stale] from AsyncLoading
+    // [not yet connected]. Do not collapse the two.
     final isStale = dataAsync.hasValue && dataAsync.value == null;
-    final DeviceState? deviceState = dataAsync.hasValue ? dataAsync.value : null;
+    final DeviceState? d = dataAsync.hasValue ? dataAsync.value : null;
 
     final isActiveConnection = status == ConnectionStatus.connected ||
         status == ConnectionStatus.connecting ||
@@ -45,97 +44,107 @@ class InstrumentScreen extends ConsumerWidget {
       backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Inclinometer', style: TextStyle(fontSize: 18)),
+        title: const Text('Leveltronic', style: TextStyle(fontSize: 18)),
         actions: [
-          // 1. Battery indicator — only when deviceState is available
-          if (deviceState != null) ...[
-            Icon(_batteryIcon(deviceState.battery), color: Colors.white, size: 20),
+          if (d != null) ...[
+            Icon(_batteryIcon(d.batteryPercent, d.charging),
+                color: Colors.white, size: 20),
             const SizedBox(width: 4),
-            Text(
-              '${deviceState.battery}%',
-              style: const TextStyle(fontSize: 13, color: Colors.white),
-            ),
+            Text('${d.batteryPercent}%',
+                style: const TextStyle(fontSize: 13, color: Colors.white)),
             const SizedBox(width: 8),
           ],
-          // 2. Connection chip — always visible (CONN-04)
           Chip(
             backgroundColor: _chipColor(status),
-            label: Text(
-              _chipLabel(status),
-              style: const TextStyle(fontSize: 13, color: Colors.white),
-            ),
+            label: Text(_chipLabel(status),
+                style: const TextStyle(fontSize: 13, color: Colors.white)),
             visualDensity: VisualDensity.compact,
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
           ),
           const SizedBox(width: 8),
-          // 3. Debug button — kDebugMode only; never compiled into release builds.
-          // Routes through ConnectionNotifier.debugSimulateDisconnect() to keep
-          // MockBleManager import out of lib/ui/ (CLAUDE.md architecture rule).
-          if (kDebugMode) ...[
+          if (kDebugMode)
             TextButton(
               onPressed: () => ref
                   .read(connectionNotifierProvider.notifier)
                   .debugSimulateDisconnect(),
-              child: const Text(
-                'Sim. Disconnect',
-                style: TextStyle(fontSize: 13, color: Colors.white70),
-              ),
+              child: const Text('Sim. Disconnect',
+                  style: TextStyle(fontSize: 13, color: Colors.white70)),
             ),
-          ],
         ],
       ),
       body: Column(
         children: [
           Expanded(
             child: SingleChildScrollView(
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AnimatedOpacity(
-                        opacity: isStale ? 0.40 : 1.0,
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeOut,
-                        child: Column(
-                          children: [
-                            _AngleRow(
-                              label: 'X',
-                              value: deviceState?.angleX ?? 0.0,
-                              onZero: status == ConnectionStatus.connected
-                                  ? () => ref
-                                      .read(connectionNotifierProvider.notifier)
-                                      .sendCommand(kCmdZeroX)
-                                  : null,
-                            ),
-                            const SizedBox(height: 16),
-                            _AngleRow(
-                              label: 'Y',
-                              value: deviceState?.angleY ?? 0.0,
-                              onZero: status == ConnectionStatus.connected
-                                  ? () => ref
-                                      .read(connectionNotifierProvider.notifier)
-                                      .sendCommand(kCmdZeroY)
-                                  : null,
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (isStale)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: AnimatedOpacity(
+                opacity: isStale ? 0.40 : 1.0,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _TiltPlaceholder(),
+                    if (isStale)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 12, bottom: 4),
+                        child: Center(
                           child: Text(
                             'DISCONNECTED',
                             style: TextStyle(
                               fontSize: 13,
-                              color: const Color(0xFFD32F2F),
+                              color: Color(0xFFD32F2F),
                               letterSpacing: 1.5,
                             ),
                           ),
                         ),
-                    ],
-                  ),
+                      ),
+                    const SizedBox(height: 16),
+                    _SectionLabel('Battery'),
+                    _ReadoutTile(
+                      label: 'Voltage',
+                      value: _fmtVolts(d?.batteryMillivolts),
+                    ),
+                    _ReadoutTile(
+                      label: 'Charge',
+                      value: d == null ? '—' : '${d.batteryPercent} %',
+                    ),
+                    _ReadoutTile(
+                      label: 'State',
+                      value: d == null ? '—' : _batteryStateLabel(d),
+                    ),
+                    const SizedBox(height: 16),
+                    _SectionLabel('Temperature'),
+                    _ReadoutTile(
+                      label: 'On-board',
+                      value: _fmtTemp(d?.onboardTempC),
+                    ),
+                    _ReadoutTile(
+                      label: 'External probe',
+                      value: _fmtTemp(d?.externalTempC),
+                    ),
+                    _ReadoutTile(
+                      label: 'Ambient (BME280)',
+                      value: _fmtTemp(d?.bme280TempC),
+                      stale: d != null && !d.bme280Fresh,
+                    ),
+                    const SizedBox(height: 16),
+                    _SectionLabel('Environment'),
+                    _ReadoutTile(
+                      label: 'Humidity',
+                      value: d?.humidityPct == null
+                          ? '—'
+                          : '${d!.humidityPct!.toStringAsFixed(1)} %RH',
+                      stale: d != null && !d.bme280Fresh,
+                    ),
+                    _ReadoutTile(
+                      label: 'Pressure',
+                      value: d?.pressureHpa == null
+                          ? '—'
+                          : '${d!.pressureHpa!.toStringAsFixed(1)} hPa',
+                      stale: d != null && !d.bme280Fresh,
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -159,51 +168,117 @@ class InstrumentScreen extends ConsumerWidget {
   }
 }
 
-/// Private row widget displaying an axis label, formatted angle, and Zero button.
-class _AngleRow extends StatelessWidget {
-  const _AngleRow({
-    required this.label,
-    required this.value,
-    required this.onZero,
-  });
+/// Large tilt readout, permanently showing "not available" until a firmware
+/// build exposes an angle Measurement resource.
+class _TiltPlaceholder extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        children: [
+          for (final axis in const ['X', 'Y'])
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(axis,
+                      style: const TextStyle(
+                          fontSize: 28, color: Colors.white38)),
+                  const Text(
+                    '––.––°',
+                    style: TextStyle(
+                      fontSize: 48,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white38,
+                      fontFeatures: [FontFeature.tabularFigures()],
+                      height: 1.0,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+              ),
+            ),
+          const SizedBox(height: 8),
+          const Text(
+            'Tilt readout not available on this firmware build',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: Colors.white30),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-  final String label;
-  final double value;
-  final VoidCallback? onZero; // null = disabled (Material default disabled appearance)
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+
+  final String text;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.only(bottom: 4, top: 4),
+      child: Text(
+        text.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 12,
+          color: Colors.white38,
+          letterSpacing: 1.2,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _ReadoutTile extends StatelessWidget {
+  const _ReadoutTile({
+    required this.label,
+    required this.value,
+    this.stale = false,
+  });
+
+  final String label;
+  final String value;
+  final bool stale;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
         children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 32, color: Colors.white54),
-          ),
-          Flexible(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerRight,
-              child: Text(
-                _formatAngle(value),
+          Text(label,
+              style: const TextStyle(fontSize: 15, color: Colors.white60)),
+          Row(
+            children: [
+              if (stale)
+                const Padding(
+                  padding: EdgeInsets.only(right: 6),
+                  child: Icon(Icons.history_toggle_off,
+                      size: 14, color: Colors.white30),
+                ),
+              Text(
+                value,
                 style: const TextStyle(
-                  fontSize: 80,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
                   color: Colors.white,
                   fontFeatures: [FontFeature.tabularFigures()],
-                  height: 1.0,
                 ),
               ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: onZero,
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(88, 44),
-            ),
-            child: Text('Zero $label'),
+            ],
           ),
         ],
       ),
@@ -212,35 +287,36 @@ class _AngleRow extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Top-level private helpers
+// Formatting helpers
 // ---------------------------------------------------------------------------
 
-/// Formats a double as ±NNN.NN° with sign always shown and zero-padded integers.
-///
-/// Uses Unicode minus (U+2212) for negative values to match typographic convention.
-/// Example: +012.34°, −003.00°
-///
-/// Guards against non-finite values (NaN/Infinity) that [StatePacket.parse]
-/// may produce from raw BLE data, and clamps to ±999.99° so the fixed-width
-/// layout is never broken by out-of-range firmware values.
-String _formatAngle(double value) {
-  if (!value.isFinite) return '  ---.--°';
-  final clamped = value.clamp(-999.99, 999.99);
-  final sign = clamped >= 0 ? '+' : '−'; // U+2212 Unicode minus, not ASCII hyphen
-  final abs = clamped.abs();
-  // toStringAsFixed(2) on 3.0 → "3.00"; padLeft(6,'0') → "003.00" (NNN.NN)
-  return '$sign${abs.toStringAsFixed(2).padLeft(6, '0')}°';
+String _fmtTemp(double? c) =>
+    c == null ? '—' : '${c >= 0 ? '+' : '−'}${c.abs().toStringAsFixed(2)} °C';
+
+String _fmtVolts(int? mv) =>
+    mv == null || mv == 0 ? '—' : '${(mv / 1000).toStringAsFixed(3)} V';
+
+String _batteryStateLabel(DeviceState d) {
+  final base = switch (d.batteryState) {
+    BatteryState.normal => 'Normal',
+    BatteryState.low => 'Low',
+    BatteryState.critical => 'Critical',
+    BatteryState.charging => 'Charging',
+    BatteryState.full => 'Full',
+    BatteryState.unknown => 'Unknown',
+  };
+  if (d.charging && d.batteryState != BatteryState.charging) return '$base · chg';
+  return base;
 }
 
-/// Returns the appropriate battery icon for a battery level percentage.
-IconData _batteryIcon(int battery) {
+IconData _batteryIcon(int battery, bool charging) {
+  if (charging) return Icons.battery_charging_full;
   if (battery > 75) return Icons.battery_full;
   if (battery > 40) return Icons.battery_6_bar;
   if (battery > 15) return Icons.battery_3_bar;
   return Icons.battery_0_bar;
 }
 
-/// Maps [ConnectionStatus] to its chip background color.
 Color _chipColor(ConnectionStatus status) {
   return switch (status) {
     ConnectionStatus.idle => const Color(0xFF757575),
@@ -254,7 +330,6 @@ Color _chipColor(ConnectionStatus status) {
   };
 }
 
-/// Maps [ConnectionStatus] to its chip label string.
 String _chipLabel(ConnectionStatus status) {
   return switch (status) {
     ConnectionStatus.idle => 'Idle',

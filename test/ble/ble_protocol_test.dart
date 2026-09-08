@@ -3,52 +3,20 @@ import 'package:test/test.dart';
 import 'package:inclinometer/ble/ble_protocol.dart';
 
 void main() {
-  group('StatePacket', () {
-    test('encode then parse round-trips float values', () {
-      const ax = 12.345;
-      const ay = -0.678;
-      const battery = 72;
-
-      final bytes = StatePacket.encode(ax, ay, battery);
-      final state = StatePacket.parse(bytes);
-
-      // float64 → float32 → float64 is lossy; use closeTo, NOT equals.
-      expect(state.angleX, closeTo(ax, 1e-4));
-      expect(state.angleY, closeTo(ay, 1e-4));
-      expect(state.battery, equals(battery));
+  group('GATT constants', () {
+    test('Transparent UART service/characteristic UUIDs are the RN4871 values',
+        () {
+      expect(kServiceUuid, equals('49535343-fe7d-4ae5-8fa9-9fafd205e455'));
+      expect(kRxCharUuid, equals('49535343-8841-43f4-a8d4-ecbe34729bb3'));
+      expect(kTxCharUuid, equals('49535343-1e4d-4bd9-ba61-23c647249616'));
     });
 
-    test('parse throws ArgumentError on wrong packet length', () {
-      expect(
-        () => StatePacket.parse([0, 1, 2]),
-        throwsA(isA<ArgumentError>()),
-      );
+    test('device name prefix matches the firmware BLE_DEVICE_NAME', () {
+      expect(kDeviceNamePrefix, equals('Leveltronic'));
     });
 
-    test('parse throws ArgumentError on battery > 100', () {
-      // Build a valid 9-byte packet with battery = 255 (firmware bug scenario).
-      final bytes = StatePacket.encode(0.0, 0.0, 0)..last; // reuse encode for angles
-      final badPacket = List<int>.from(bytes)..[8] = 255;
-      expect(
-        () => StatePacket.parse(badPacket),
-        throwsA(isA<ArgumentError>()),
-      );
-    });
-
-    test('encode produces exactly 9 bytes', () {
-      final bytes = StatePacket.encode(0.0, 0.0, 100);
-      expect(bytes.length, equals(9));
-    });
-
-    test('command constants have correct values', () {
-      expect(kCmdZeroX, equals(0x01));
-      expect(kCmdZeroY, equals(0x02));
-    });
-
-    test('UUID constants are non-empty strings', () {
-      expect(kServiceUuid.isNotEmpty, isTrue);
-      expect(kStateCharUuid.isNotEmpty, isTrue);
-      expect(kCommandCharUuid.isNotEmpty, isTrue);
+    test('subscription interval respects the 50 ms firmware floor', () {
+      expect(kSubscriptionInterval.inMilliseconds, greaterThanOrEqualTo(50));
     });
   });
 }

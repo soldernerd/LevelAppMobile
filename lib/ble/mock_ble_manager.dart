@@ -1,33 +1,36 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:inclinometer/ble/api_v2.dart';
 import 'package:inclinometer/ble/ble_manager.dart';
-import 'package:inclinometer/ble/ble_protocol.dart';
 import 'package:inclinometer/models/device_state.dart';
 
-/// WP1 mock implementation of [BleManager].
+/// Synthetic [BleManager] for tests and for running the app without hardware.
 ///
-/// Produces animated random-walk angle and battery streams behind the
-/// [BleManager] interface. All behaviour is testable without a device.
+/// Produces an animated random-walk [DeviceState] behind the [BleManager]
+/// interface: battery slowly drains, temperatures / humidity / pressure
+/// wander. Tilt is left null — the real firmware has no tilt output either,
+/// so the UI placeholder path is exercised identically.
 ///
-/// Inject a seeded [Random] via the constructor for deterministic tests:
+/// Inject a seeded [Random] for deterministic tests:
 /// ```dart
 /// final mock = MockBleManager(random: Random(0));
 /// ```
 ///
-/// [simulateDisconnect] is a WP1-only debug escape hatch. It is NOT part of
-/// the [BleManager] interface — only code with a concrete [MockBleManager]
-/// reference may call it (e.g. a debug button in Phase 4 or a test).
+/// [simulateDisconnect] is a debug escape hatch, not part of [BleManager] —
+/// only code holding a concrete [MockBleManager] reference may call it.
 class MockBleManager implements BleManager {
-  // --- streams (eager-initialized broadcast controllers) ---
   final _scanController = StreamController<ScannedDevice>.broadcast();
   final _statusController = StreamController<ConnectionStatus>.broadcast();
-  final _packetController = StreamController<List<int>>.broadcast();
+  final _deviceController = StreamController<DeviceState?>.broadcast();
 
-  // --- mutable state ---
-  double _angleX = 0.0;
-  double _angleY = 0.0;
-  int _battery = 85;
+  double _onboardTemp = 24.5;
+  double _externalTemp = 22.0;
+  double _bmeTemp = 23.8;
+  double _humidity = 41.0;
+  int _pressurePa = 96_400;
+  int _batteryPct = 85;
+  int _batteryMv = 4020;
   int _tickCount = 0;
 
   Timer? _ticker;
@@ -37,8 +40,6 @@ class MockBleManager implements BleManager {
 
   MockBleManager({Random? random}) : _rng = random ?? Random();
 
-  // --- BleManager interface ---
-
   @override
   Stream<ScannedDevice> get scanResults => _scanController.stream;
 
@@ -46,18 +47,18 @@ class MockBleManager implements BleManager {
   Stream<ConnectionStatus> get connectionStatus => _statusController.stream;
 
   @override
-  Stream<List<int>> get statePackets => _packetController.stream;
+  Stream<DeviceState?> get deviceStream => _deviceController.stream;
 
   @override
   Future<void> startScan() async {
-    _scanTimer?.cancel(); // WR-01: cancel any in-flight scan timer
+    _scanTimer?.cancel();
     _scanTimer = null;
     _statusController.add(ConnectionStatus.scanning);
     _scanTimer = Timer(const Duration(milliseconds: 500), () {
       if (!_scanController.isClosed) {
         _scanController.add(const ScannedDevice(
           id: 'AA:BB:CC:DD:EE:FF',
-          name: 'Inclinometer',
+          name: 'Leveltronic-EEFF',
           rssi: -65,
         ));
       }
@@ -75,14 +76,12 @@ class MockBleManager implements BleManager {
 
   @override
   Future<void> connect(String deviceId) async {
-    _stopTicker(); // CR-01: cancel any in-flight ticker before reconnecting
-    if (_statusController.isClosed) return; // CR-02: guard async gap
+    _stopTicker();
+    if (_statusController.isClosed) return;
     _statusController.add(ConnectionStatus.connecting);
-    await Future.delayed(const Duration(milliseconds: 300)); // D-05; CLAUDE.md constraint
-    _angleX = 0.0; // reset on reconnect (Claude's discretion, D-12)
-    _angleY = 0.0;
+    await Future.delayed(const Duration(milliseconds: 300));
     _tickCount = 0;
-    if (!_statusController.isClosed) { // CR-02: guard after async gap
+    if (!_statusController.isClosed) {
       _statusController.add(ConnectionStatus.connected);
       _startTicker();
     }
@@ -90,28 +89,25 @@ class MockBleManager implements BleManager {
 
   @override
   Future<void> disconnect() async {
-    if (_statusController.isClosed) return; // CR-02: guard against post-dispose call
-    _statusController.add(ConnectionStatus.disconnecting); // D-13
+    if (_statusController.isClosed) return;
+    _statusController.add(ConnectionStatus.disconnecting);
     _stopTicker();
     if (!_statusController.isClosed) {
       _statusController.add(ConnectionStatus.disconnected);
     }
+    if (!_deviceController.isClosed) {
+      _deviceController.add(null); // stale sentinel
+    }
   }
 
-  @override
-  Future<void> sendCommand(int commandByte) async {
-    if (commandByte == kCmdZeroX) _angleX = 0.0; // D-09
-    if (commandByte == kCmdZeroY) _angleY = 0.0; // D-09
-    // unknown commands: silent no-op (D-10)
-  }
-
-  /// WP1-only debug escape hatch. Simulates involuntary disconnect.
-  /// NOT part of [BleManager] — only [MockBleManager] callers may call this
-  /// (e.g. a debug button in Phase 4 or a test).
+  /// Debug-only: simulates an involuntary disconnect.
   void simulateDisconnect() {
     _stopTicker();
     if (!_statusController.isClosed) {
-      _statusController.add(ConnectionStatus.disconnected); // D-11
+      _statusController.add(ConnectionStatus.disconnected);
+    }
+    if (!_deviceController.isClosed) {
+      _deviceController.add(null);
     }
   }
 
@@ -121,26 +117,46 @@ class MockBleManager implements BleManager {
     _scanTimer?.cancel();
     _scanController.close();
     _statusController.close();
-    _packetController.close();
+    _deviceController.close();
   }
 
-  // --- internal helpers ---
+  // --- internals ---------------------------------------------------------
+
+  double _walk(double v, double step, double lo, double hi) =>
+      (v + (_rng.nextDouble() - 0.5) * step).clamp(lo, hi);
 
   void _startTicker() {
-    _ticker = Timer.periodic(const Duration(milliseconds: 100), (_) {
-      if (_packetController.isClosed) return; // T-02-02: guard against post-dispose tick
-      _angleX = (_angleX + (_rng.nextDouble() - 0.5) * 0.2).clamp(-45.0, 45.0); // D-02, D-03
-      _angleY = (_angleY + (_rng.nextDouble() - 0.5) * 0.2).clamp(-45.0, 45.0); // D-02, D-03
+    _ticker = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      if (_deviceController.isClosed) return;
+      _onboardTemp = _walk(_onboardTemp, 0.15, 15, 40);
+      _externalTemp = _walk(_externalTemp, 0.2, -10, 45);
+      _bmeTemp = _walk(_bmeTemp, 0.15, 15, 40);
+      _humidity = _walk(_humidity, 0.6, 20, 80);
+      _pressurePa = (_pressurePa + (_rng.nextInt(21) - 10)).clamp(94_000, 99_000);
       _tickCount++;
-      if (_tickCount % 100 == 0) {
-        _battery = (_battery - 1).clamp(0, 100); // D-04
+      if (_tickCount % 40 == 0) {
+        _batteryPct = (_batteryPct - 1).clamp(0, 100);
+        _batteryMv = (_batteryMv - 4).clamp(3300, 4200);
       }
-      _packetController.add(StatePacket.encode(_angleX, _angleY, _battery));
+      _deviceController.add(DeviceState(
+        batteryPercent: _batteryPct,
+        batteryMillivolts: _batteryMv,
+        batteryState:
+            _batteryPct <= 10 ? BatteryState.low : BatteryState.normal,
+        onboardTempC: _onboardTemp,
+        externalTempC: _externalTemp,
+        bme280TempC: _bmeTemp,
+        pressurePa: _pressurePa,
+        humidityPct: _humidity,
+        bme280Fresh: true,
+        usbConnected: false,
+        charging: false,
+      ));
     });
   }
 
   void _stopTicker() {
     _ticker?.cancel();
-    _ticker = null; // null after cancel — prevents stale isActive checks
+    _ticker = null;
   }
 }

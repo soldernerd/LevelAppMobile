@@ -2,25 +2,26 @@ import 'package:inclinometer/models/device_state.dart';
 
 /// Abstract interface for all BLE operations.
 ///
-/// WP1 uses [MockBleManager]; WP2 swaps in RealBleManager via a single
-/// ProviderScope.overrides change in main.dart.
-///
-/// No flutter_blue_plus import — ever. The isolation boundary is here.
+/// [RealBleManager] talks to the instrument over `flutter_blue_plus`;
+/// [MockBleManager] drives the UI with synthetic data for tests and for
+/// running without hardware. The concrete class is chosen once, in
+/// `main.dart`, via a `ProviderScope` override — nothing else in the app
+/// imports `flutter_blue_plus`. That import isolation boundary lives here.
 abstract class BleManager {
   /// Emits [ScannedDevice] entries while a scan is active.
   Stream<ScannedDevice> get scanResults;
 
-  /// Current connection state for the paired instrument.
+  /// Current connection state for the instrument.
   Stream<ConnectionStatus> get connectionStatus;
 
-  /// Raw 9-byte state packets from the instrument characteristic.
-  Stream<List<int>> get statePackets;
+  /// Live merged instrument snapshots. Emits `null` as a stale-data sentinel
+  /// on disconnect/error so the UI never shows last-known values as live.
+  Stream<DeviceState?> get deviceStream;
 
   Future<void> startScan();
   Future<void> stopScan();
   Future<void> connect(String deviceId);
   Future<void> disconnect();
-  Future<void> sendCommand(int commandByte);
 
   void dispose();
 }

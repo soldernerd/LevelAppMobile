@@ -3,86 +3,60 @@ import 'dart:math';
 import 'package:fake_async/fake_async.dart';
 import 'package:test/test.dart';
 
-import 'package:inclinometer/ble/ble_protocol.dart';
 import 'package:inclinometer/ble/mock_ble_manager.dart';
 import 'package:inclinometer/models/device_state.dart';
 
 void main() {
   group('MockBleManager', () {
-    // MOCK-01: Packet rate and angle bounds
-    test('statePackets emits at least 10 packets in 1s and angles stay within bounds', () {
+    test('deviceStream emits animated snapshots once connected', () {
       fakeAsync((async) {
         final mock = MockBleManager(random: Random(0));
-        final packets = <List<int>>[];
-
-        // Subscribe BEFORE connect (broadcast streams don't buffer)
-        mock.statePackets.listen(packets.add);
-
-        // Trigger connect (no await inside fakeAsync — use elapse + flushFutures)
-        mock.connect('AA:BB:CC:DD:EE:FF');
-        async.elapse(const Duration(milliseconds: 300)); // fires connect delay
-        async.flushMicrotasks(); // resolves the Future.delayed continuation
-
-        // Elapse 1000ms — 10 ticks at 100ms each
-        async.elapse(const Duration(milliseconds: 1000));
-
-        expect(packets.length, greaterThanOrEqualTo(10));
-
-        for (final packet in packets) {
-          final state = StatePacket.parse(packet);
-          expect(
-            state.angleX,
-            inInclusiveRange(-45.0, 45.0),
-            reason: 'angleX ${state.angleX} must be within [-45.0, 45.0]',
-          );
-          expect(
-            state.angleY,
-            inInclusiveRange(-45.0, 45.0),
-            reason: 'angleY ${state.angleY} must be within [-45.0, 45.0]',
-          );
-        }
-
-        mock.dispose();
-      });
-    });
-
-    // MOCK-02: Battery drift — decrements by at least 1 in 10 seconds virtual time
-    test('battery decrements by at least 1 after 10 seconds of virtual time', () {
-      fakeAsync((async) {
-        final mock = MockBleManager(random: Random(0));
-        final packets = <List<int>>[];
-
-        mock.statePackets.listen(packets.add);
+        final states = <DeviceState?>[];
+        mock.deviceStream.listen(states.add);
 
         mock.connect('AA:BB:CC:DD:EE:FF');
         async.elapse(const Duration(milliseconds: 300));
         async.flushMicrotasks();
 
-        // Capture initial battery from first packet
-        async.elapse(const Duration(milliseconds: 100)); // 1 tick
-        final initialBattery = StatePacket.parse(packets.first).battery;
+        async.elapse(const Duration(seconds: 1)); // 4 ticks at 250 ms
 
-        // Elapse 10000ms — 100 ticks — one battery drain cycle (100 ticks → -1%)
-        async.elapse(const Duration(milliseconds: 10000));
-
-        final finalBattery = StatePacket.parse(packets.last).battery;
-        expect(
-          finalBattery,
-          lessThan(initialBattery),
-          reason: 'Battery should have decremented: initial=$initialBattery, final=$finalBattery',
-        );
-
+        final snapshots = states.whereType<DeviceState>().toList();
+        expect(snapshots.length, greaterThanOrEqualTo(4));
+        for (final s in snapshots) {
+          expect(s.angleX, isNull, reason: 'tilt is never synthesised');
+          expect(s.batteryPercent, inInclusiveRange(0, 100));
+          expect(s.onboardTempC, isNotNull);
+          expect(s.humidityPct, inInclusiveRange(20, 80));
+        }
         mock.dispose();
       });
     });
 
-    // MOCK-03: connect() emits connecting then connected
-    test('connect() emits ConnectionStatus.connecting then .connected', () {
+    test('battery drains over virtual time', () {
+      fakeAsync((async) {
+        final mock = MockBleManager(random: Random(0));
+        final states = <DeviceState?>[];
+        mock.deviceStream.listen(states.add);
+
+        mock.connect('AA:BB:CC:DD:EE:FF');
+        async.elapse(const Duration(milliseconds: 300));
+        async.flushMicrotasks();
+
+        async.elapse(const Duration(milliseconds: 250)); // first tick
+        final initial = states.whereType<DeviceState>().first.batteryPercent;
+
+        async.elapse(const Duration(seconds: 20)); // > 40 ticks -> at least one drain
+        final last = states.whereType<DeviceState>().last.batteryPercent;
+
+        expect(last, lessThan(initial));
+        mock.dispose();
+      });
+    });
+
+    test('connect() emits connecting then connected', () {
       fakeAsync((async) {
         final mock = MockBleManager();
         final statuses = <ConnectionStatus>[];
-
-        // Subscribe BEFORE connect (PITFALL-2: expectLater must precede emission)
         mock.connectionStatus.listen(statuses.add);
 
         mock.connect('AA:BB:CC:DD:EE:FF');
@@ -91,53 +65,36 @@ void main() {
 
         expect(
           statuses,
-          containsAllInOrder([ConnectionStatus.connecting, ConnectionStatus.connected]),
+          containsAllInOrder(
+              [ConnectionStatus.connecting, ConnectionStatus.connected]),
         );
-
         mock.dispose();
       });
     });
 
-    // MOCK-04: simulateDisconnect() emits disconnected and silences statePackets
-    test('simulateDisconnect() emits .disconnected and statePackets goes silent', () {
+    test('simulateDisconnect() emits disconnected + null sentinel and stops ticking',
+        () {
       fakeAsync((async) {
         final mock = MockBleManager(random: Random(0));
-        final statusEmitted = <ConnectionStatus>[];
+        final statuses = <ConnectionStatus>[];
+        final states = <DeviceState?>[];
+        mock.connectionStatus.listen(statuses.add);
+        mock.deviceStream.listen(states.add);
 
-        // Subscribe to connectionStatus BEFORE triggering emissions (PITFALL-2)
-        mock.connectionStatus.listen(statusEmitted.add);
-
-        // Connect and wait until connected
         mock.connect('AA:BB:CC:DD:EE:FF');
         async.elapse(const Duration(milliseconds: 300));
         async.flushMicrotasks();
+        async.elapse(const Duration(milliseconds: 750)); // a few ticks
 
-        // Listen to statePackets and count events
-        var count = 0;
-        mock.statePackets.listen((_) => count++);
+        final countBefore = states.whereType<DeviceState>().length;
+        expect(countBefore, greaterThanOrEqualTo(2));
 
-        // Elapse 500ms — 5 ticks
-        async.elapse(const Duration(milliseconds: 500));
-        final countAtDisconnect = count;
-        expect(countAtDisconnect, greaterThanOrEqualTo(5));
-
-        // Disconnect — statePackets must go silent
         mock.simulateDisconnect();
+        async.elapse(const Duration(seconds: 1));
 
-        // Elapse another 500ms — no new ticks should fire
-        async.elapse(const Duration(milliseconds: 500));
-
-        expect(
-          count,
-          equals(countAtDisconnect),
-          reason: 'No new statePackets should be emitted after simulateDisconnect()',
-        );
-        expect(
-          statusEmitted,
-          contains(ConnectionStatus.disconnected),
-          reason: 'simulateDisconnect() must emit ConnectionStatus.disconnected',
-        );
-
+        expect(states.whereType<DeviceState>().length, equals(countBefore));
+        expect(states.last, isNull);
+        expect(statuses, contains(ConnectionStatus.disconnected));
         mock.dispose();
       });
     });

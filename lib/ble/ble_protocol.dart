@@ -1,57 +1,24 @@
-import 'dart:typed_data';
+/// GATT identifiers and scan parameters for the Leveltronic instrument.
+///
+/// The instrument's BLE link is a Microchip RN4871 module in **Transparent
+/// UART** mode — a raw byte stream carrying framed API v2 packets (see
+/// [api_v2.dart]). These are the Microchip ISSC Transparent UART service and
+/// characteristic UUIDs the firmware exposes (`docs/api-reference.md`).
+library;
 
-import 'package:inclinometer/models/device_state.dart';
+/// Transparent UART service.
+const String kServiceUuid = '49535343-fe7d-4ae5-8fa9-9fafd205e455';
 
-// GATT service and characteristic UUIDs (placeholder values for WP1).
-const String kServiceUuid = '0000XXXX-0000-1000-8000-00805f9b34fb';
-const String kStateCharUuid = '0000YYYY-0000-1000-8000-00805f9b34fb';
-const String kCommandCharUuid = '0000ZZZZ-0000-1000-8000-00805f9b34fb';
+/// Host → module: request packets are written here (Write Without Response).
+const String kRxCharUuid = '49535343-8841-43f4-a8d4-ecbe34729bb3';
 
-// Command byte constants sent to the instrument.
-const int kCmdZeroX = 0x01;
-const int kCmdZeroY = 0x02;
+/// Module → host: responses and subscription pushes arrive as notifications.
+const String kTxCharUuid = '49535343-1e4d-4bd9-ba61-23c647249616';
 
-/// Parses and encodes the 9-byte state packet:
-///   bytes 0–3  angleX   float32 LE
-///   bytes 4–7  angleY   float32 LE
-///   byte  8    battery  uint8
-class StatePacket {
-  /// Parses a raw 9-byte BLE characteristic value into a [DeviceState].
-  ///
-  /// Throws [ArgumentError] if [bytes] is not exactly 9 bytes, or if the
-  /// battery byte exceeds 100 (valid range is 0–100 percent).
-  /// Unlike `assert`, these guards fire in both debug and release builds.
-  static DeviceState parse(List<int> bytes) {
-    if (bytes.length != 9) {
-      throw ArgumentError.value(
-        bytes.length,
-        'bytes',
-        'State packet must be exactly 9 bytes',
-      );
-    }
-    final rawBattery = bytes[8];
-    if (rawBattery > 100) {
-      throw ArgumentError.value(
-        rawBattery,
-        'battery',
-        'Battery must be 0–100 (got $rawBattery — firmware protocol error?)',
-      );
-    }
-    // ByteData.sublistView requires TypedData — Uint8List.fromList() is mandatory.
-    final bd = ByteData.sublistView(Uint8List.fromList(bytes));
-    return DeviceState(
-      angleX: bd.getFloat32(0, Endian.little),
-      angleY: bd.getFloat32(4, Endian.little),
-      battery: rawBattery,
-    );
-  }
+/// The instrument advertises as `Leveltronic-<last 2 MAC bytes>`
+/// (firmware `Config/config.h` `BLE_DEVICE_NAME`). Scans filter on this prefix.
+const String kDeviceNamePrefix = 'Leveltronic';
 
-  /// Encodes angle and battery values into a 9-byte packet.
-  static List<int> encode(double ax, double ay, int battery) {
-    final bd = ByteData(9);
-    bd.setFloat32(0, ax, Endian.little);
-    bd.setFloat32(4, ay, Endian.little);
-    bd.setUint8(8, battery);
-    return bd.buffer.asUint8List().toList();
-  }
-}
+/// How often the app asks the instrument to push the topic-group snapshots
+/// once connected. 50 ms floor is enforced by firmware.
+const Duration kSubscriptionInterval = Duration(milliseconds: 250);

@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'package:inclinometer/ble/ble_manager.dart';
-import 'package:inclinometer/ble/ble_protocol.dart';
 import 'package:inclinometer/ble/mock_ble_manager.dart';
 import 'package:inclinometer/models/device_state.dart';
 
@@ -38,7 +37,7 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
   final _packetController = StreamController<DeviceState?>.broadcast();
   final _scannedDevices = <ScannedDevice>[];
 
-  /// Broadcast stream of parsed instrument packets.
+  /// Broadcast stream of merged instrument snapshots.
   ///
   /// Emits null on disconnect/error (stale sentinel per D-05/D-06).
   Stream<DeviceState?> get instrumentStream => _packetController.stream;
@@ -71,21 +70,11 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
       }
     });
 
-    // Subscribe to raw BLE packets — forward parsed packets to shared controller.
-    // try/catch prevents Riverpod retry storm at 10 Hz mock rate (PITFALL-5, T-03-03).
-    final packetSub = manager.statePackets.listen((bytes) {
+    // Forward merged device snapshots (and null stale sentinels) straight
+    // through — decoding/merging now lives in the BleManager implementation.
+    final packetSub = manager.deviceStream.listen((state) {
       if (!_packetController.isClosed) {
-        try {
-          _packetController.add(StatePacket.parse(bytes));
-        } catch (e) {
-          // Parse error — swallow with debug log; do not rethrow into stream.
-          // Prevents Riverpod automatic retry storm (T-03-03).
-          assert(() {
-            // ignore: avoid_print
-            print('[ConnectionNotifier] StatePacket.parse error: $e');
-            return true;
-          }());
-        }
+        _packetController.add(state);
       }
     });
 
@@ -179,14 +168,6 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
     } catch (e) {
       state = ConnectionStatus.error;
     }
-  }
-
-  /// Sends a command byte to the instrument via [BleManager].
-  ///
-  /// Used by Zero X / Zero Y buttons in InstrumentScreen.
-  /// Keeps [BleManager] access out of [lib/ui/] per CLAUDE.md architecture rule.
-  Future<void> sendCommand(int commandByte) async {
-    await ref.read(bleManagerProvider).sendCommand(commandByte);
   }
 
   /// Debug-only: simulates an involuntary disconnect via [MockBleManager].

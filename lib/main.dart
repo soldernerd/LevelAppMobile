@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:inclinometer/ble/mock_ble_manager.dart';
+import 'package:inclinometer/ble/real_ble_manager.dart';
 import 'package:inclinometer/models/device_state.dart';
 import 'package:inclinometer/providers/device_provider.dart';
 import 'package:inclinometer/ui/instrument_screen.dart';
@@ -22,11 +22,12 @@ class _AppLifecycleObserver extends WidgetsBindingObserver {
   }
 }
 
-// WP2 swap point: replace MockBleManager() with RealBleManager() here.
+// The single place the concrete BLE implementation is chosen. Swap in
+// MockBleManager() here to drive the UI without hardware.
 // All overrides live on _container — ProviderScope uses parent: _container.
 final _container = ProviderContainer(
   overrides: [
-    bleManagerProvider.overrideWithValue(MockBleManager()),
+    bleManagerProvider.overrideWithValue(RealBleManager()),
   ],
 );
 

@@ -31,6 +31,15 @@ android {
         versionName = flutter.versionName
     }
 
+    // Distribution channels. Same applicationId — `github` is the sideload
+    // build (self-updater + REQUEST_INSTALL_PACKAGES, extras merged in from
+    // src/github/), `play` is the Google Play build (self-updater stripped).
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("github") { dimension = "distribution" }
+        create("play") { dimension = "distribution" }
+    }
+
     signingConfigs {
         create("release") {
             if (keystorePropertiesFile.exists()) {

@@ -61,12 +61,18 @@ jobs:
             "${{ secrets.KEY_ALIAS }}" \
             > android/key.properties
 
-      - name: Build release APK
+      # github flavor = the sideload APK with the in-app self-updater. The
+      # built file is app-github-release.apk; rename it back to app-release.apk
+      # so already-installed apps (which look for that exact asset name) keep
+      # self-updating.
+      - name: Build github release APK
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          flutter build apk --release \
+          flutter build apk --release --flavor github \
             --build-name="${{ steps.ver.outputs.name }}" \
             --build-number="$(git rev-list --count HEAD)"
+          mv build/app/outputs/flutter-apk/app-github-release.apk \
+             build/app/outputs/flutter-apk/app-release.apk
 
       - name: Create GitHub release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -76,3 +82,33 @@ jobs:
           name: ${{ steps.ver.outputs.tag }}
           generate_release_notes: true
           files: build/app/outputs/flutter-apk/app-release.apk
+
+      # play flavor = Google Play build (no self-updater, no INTERNET /
+      # REQUEST_INSTALL_PACKAGES). Produces a signed AAB for the Play Console.
+      - name: Build Play release bundle (AAB)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          flutter build appbundle --release --flavor play \
+            --build-name="${{ steps.ver.outputs.name }}" \
+            --build-number="$(git rev-list --count HEAD)"
+
+      - name: Upload Play AAB artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: play-release-aab
+          path: build/app/outputs/bundle/playRelease/app-play-release.aab
+          if-no-files-found: error
+
+      # Once a Play service account JSON is stored as the PLAY_SERVICE_ACCOUNT_JSON
+      # secret, replace the artifact upload above with a direct publish:
+      #
+      # - name: Publish to Google Play (internal track)
+      #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      #   uses: r0adkll/upload-google-play@v1
+      #   with:
+      #     serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+      #     packageName: com.soldernerd.inclinometer
+      #     releaseFiles: build/app/outputs/bundle/playRelease/app-play-release.aab
+      #     track: internal
+      #     status: completed

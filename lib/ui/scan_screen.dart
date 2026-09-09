@@ -4,6 +4,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:inclinometer/config/build_flavor.dart';
 import 'package:inclinometer/models/device_state.dart';
 import 'package:inclinometer/providers/device_provider.dart';
 import 'package:inclinometer/providers/update_provider.dart';
@@ -65,19 +66,23 @@ class ScanScreen extends ConsumerWidget {
     // ref.listen (not ref.watch) so the widget does not rebuild on state change.
     // addPostFrameCallback defers showDialog out of the build phase (Pitfall 2).
     // _updateDialogShown guard prevents duplicate dialogs on provider rebuild.
-    ref.listen<AsyncValue<UpdateInfo?>>(
-      updateCheckProvider,
-      (_, next) {
-        next.whenData((info) {
-          if (info == null || _updateDialogShown) return;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!context.mounted) return;
-            _updateDialogShown = true;
-            _showUpdateDialog(context, ref, info);
+    // Skipped entirely on Play builds — kSelfUpdateEnabled is a compile-time
+    // const, so the dialog code tree-shakes out of the release binary.
+    if (kSelfUpdateEnabled) {
+      ref.listen<AsyncValue<UpdateInfo?>>(
+        updateCheckProvider,
+        (_, next) {
+          next.whenData((info) {
+            if (info == null || _updateDialogShown) return;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!context.mounted) return;
+              _updateDialogShown = true;
+              _showUpdateDialog(context, ref, info);
+            });
           });
-        });
-      },
-    );
+        },
+      );
+    }
 
     // D-01: Show rationale dialog before system permission prompt on first render.
     // addPostFrameCallback ensures we are outside the build phase when showing

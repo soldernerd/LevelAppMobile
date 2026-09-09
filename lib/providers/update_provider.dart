@@ -9,6 +9,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:inclinometer/config/build_flavor.dart';
 import 'package:inclinometer/services/update_service.dart';
 
 /// One-shot update check provider (D-11: autoDispose, fires once per session).
@@ -19,5 +20,7 @@ import 'package:inclinometer/services/update_service.dart';
 ///
 /// Fires exactly once per ScanScreen lifecycle (cold-start check).
 final updateCheckProvider = FutureProvider<UpdateInfo?>((ref) async {
+  // Play builds must never self-update — resolve to "nothing available".
+  if (!kSelfUpdateEnabled) return null;
   return UpdateService.checkForUpdate();
 });

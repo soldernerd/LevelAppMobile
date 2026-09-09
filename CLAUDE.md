@@ -85,6 +85,26 @@ Config: YOLO mode, standard granularity, parallel execution, research + plan-che
 
 **Build:** `minSdkVersion 24` / `compileSdkVersion 35`
 
+## Distribution / build flavors
+
+Two Android product flavors (dimension `distribution`, same `applicationId`):
+
+| Flavor | Channel | Self-update | Manifest extras |
+|--------|---------|-------------|-----------------|
+| `github` | GitHub Releases sideload (default) | active | `INTERNET`, `REQUEST_INSTALL_PACKAGES`, `FileProvider` (from `android/app/src/github/`) |
+| `play` | Google Play | compiled out | none |
+
+- `flutter run` / `flutter build` **require `--flavor github` or `--flavor play`**
+  once flavors exist. `flutter test` / `flutter analyze` do not.
+- `kSelfUpdateEnabled` (`lib/config/build_flavor.dart`) is `appFlavor != 'play'`
+  — a compile-time const, so the updater tree-shakes out of the Play binary.
+  Host/unit-test builds have no flavor ⇒ treated as `github`.
+- CI (`ci.yml`, push to `main`): builds the `github` APK (renamed to
+  `app-release.apk` for the self-updater), publishes the GitHub release, and
+  builds the `play` AAB as a workflow artifact (`play-release-aab`). Wire a
+  `PLAY_SERVICE_ACCOUNT_JSON` secret + `r0adkll/upload-google-play` to publish
+  to Play directly.
+
 ## Constraints
 
 - Mock `connect()` simulates a ~300 ms delay (exercises the `connecting` state)

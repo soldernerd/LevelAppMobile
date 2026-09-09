@@ -93,7 +93,7 @@ Future<void> main() async {
     UncontrolledProviderScope(
       container: _container,
       child: MaterialApp.router(
-        title: 'Inclinometer',
+        title: 'Leveltronic',
         // D-05: dark theme only — no light/adaptive theme.
         theme: ThemeData.dark(),
         debugShowCheckedModeBanner: false,

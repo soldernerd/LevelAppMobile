@@ -9,7 +9,7 @@
          in src/github/AndroidManifest.xml — the `play` flavor must not ship
          them (Google Play forbids self-updating apps). -->
     <application
-        android:label="inclinometer"
+        android:label="Leveltronic"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

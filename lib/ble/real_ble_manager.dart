@@ -256,7 +256,8 @@ class RealBleManager implements BleManager {
 
   @override
   Future<Api2ZeroCalStatus?> pollZeroCalibration() async {
-    final frame = await _tryRequest(opGetRaw(Api2RawRes.zeroCalStatus));
+    final frame = await _tryRequest(opGetRaw(Api2RawRes.zeroCalStatus),
+        timeout: _pollTimeout);
     if (frame == null || !frame.isOk) return null;
     return Api2ZeroCalStatus.decode(frame.data);
   }
@@ -275,7 +276,8 @@ class RealBleManager implements BleManager {
 
   @override
   Future<Api2PrecisionStatus?> pollPrecisionMeasurement() async {
-    final frame = await _tryRequest(opGetRaw(Api2RawRes.precisionStatus));
+    final frame = await _tryRequest(opGetRaw(Api2RawRes.precisionStatus),
+        timeout: _pollTimeout);
     if (frame == null || !frame.isOk) return null;
     return Api2PrecisionStatus.decode(frame.data);
   }
@@ -306,13 +308,23 @@ class RealBleManager implements BleManager {
 
   /// Like [_request] but never throws — returns null on timeout, a missing
   /// connection, or any other comms failure, so pollers can just retry.
-  Future<Api2Frame?> _tryRequest(int opcode, {List<int> payload = const []}) async {
+  Future<Api2Frame?> _tryRequest(
+    int opcode, {
+    List<int> payload = const [],
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
     try {
-      return await _request(opcode, payload: payload);
+      return await _request(opcode, payload: payload, timeout: timeout);
     } catch (_) {
       return null;
     }
   }
+
+  /// Short timeout for the zero-cal/precision status polls: they're retried
+  /// every ~200ms by the UI, so a single dropped write-without-response
+  /// should surface quickly rather than stalling the whole poll loop for
+  /// the default 5s.
+  static const _pollTimeout = Duration(seconds: 2);
 
   Future<Api2Frame> _request(
     int opcode, {
@@ -322,13 +334,28 @@ class RealBleManager implements BleManager {
     if (_rxChar == null) {
       throw StateError('not connected');
     }
+    // A caller (e.g. a poll loop) is expected to await one request before
+    // issuing the next for the same opcode, but guard against it anyway:
+    // fail any still-outstanding request for this opcode immediately rather
+    // than silently orphaning it — an orphan would otherwise sit until its
+    // own timeout and then evict whatever completer is current at that
+    // point, which could be a much newer, still-live request.
+    final superseded = _pending[opcode];
+    if (superseded != null && !superseded.isCompleted) {
+      superseded.completeError(StateError('superseded by a newer request'));
+    }
     final completer = Completer<Api2Frame>();
     _pending[opcode] = completer;
     await _send(buildPacket(opcode, payload));
     try {
       return await completer.future.timeout(timeout);
     } finally {
-      _pending.remove(opcode);
+      // Only clear our own entry. If we just timed out, a newer request for
+      // the same opcode may already have replaced it in the map — removing
+      // unconditionally would evict that live completer instead of ours.
+      if (identical(_pending[opcode], completer)) {
+        _pending.remove(opcode);
+      }
     }
   }
 

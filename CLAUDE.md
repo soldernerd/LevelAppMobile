@@ -41,6 +41,16 @@ See its `docs/api-reference.md` for the authoritative contract.
   `Completer` map correlating a GET/EXECUTE to its response, distinct from
   the fire-and-forget subscription-push path (`_pushHandlers`). Polling lives
   in the Riverpod notifiers (`Timer.periodic`, ~200 ms), not in the manager.
+- **Poll-loop race, fixed once already — don't reintroduce it.** A poll
+  notifier must never have two requests for the same opcode in flight at
+  once (`_pollInFlight` guard in both notifiers) and must discard a response
+  that resolves after `cancel()`/`reset()`/a fresh `start()` moved on (the
+  `_generation` counter, checked right after the `await`). Without both,
+  a slow/dropped round trip lets a later request silently steal an earlier
+  one's completer in `RealBleManager._pending` (or vice versa), which showed
+  up as sparse progress updates and a spurious "lost contact" error arriving
+  *after* a correct result was already displayed. Regression tests:
+  `test/providers/measurement_provider_test.dart`'s "stale poll" cases.
 
 ## Planning
 

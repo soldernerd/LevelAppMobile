@@ -85,6 +85,19 @@ class ZeroCalibrationNotifier extends Notifier<ZeroCalUiState> {
   Timer? _poller;
   int _pollFailures = 0;
 
+  /// Guards against overlapping polls: a slow/dropped round trip must not
+  /// let a second request for the same opcode go out before the first
+  /// resolves (see [RealBleManager._request] for what that races with).
+  bool _pollInFlight = false;
+
+  /// Bumped by every action that makes prior polls stale ([start],
+  /// [confirmRotated], [cancel], [reset]). A [_poll] callback that resolves
+  /// after its generation has moved on is discarded — this stops a poll
+  /// that was in flight when the user hit Cancel (or a fresh run started)
+  /// from landing a late update (or a manufactured timeout error) on top of
+  /// whatever state came after it.
+  int _generation = 0;
+
   @override
   ZeroCalUiState build() {
     ref.onDispose(() => _poller?.cancel());
@@ -96,9 +109,12 @@ class ZeroCalibrationNotifier extends Notifier<ZeroCalUiState> {
         state.phase != ZeroCalUiPhase.error) {
       return;
     }
+    final gen = ++_generation;
+    _poller?.cancel();
     state = const ZeroCalUiState(phase: ZeroCalUiPhase.runningStep1);
     final status =
         await ref.read(bleManagerProvider).zeroCalibrationStep1();
+    if (gen != _generation) return; // superseded while awaiting the EXECUTE
     if (status != Api2Status.ok) {
       state = ZeroCalUiState(
         phase: ZeroCalUiPhase.error,
@@ -106,14 +122,17 @@ class ZeroCalibrationNotifier extends Notifier<ZeroCalUiState> {
       );
       return;
     }
-    _startPolling();
+    _startPolling(gen);
   }
 
   Future<void> confirmRotated() async {
     if (state.phase != ZeroCalUiPhase.awaitingRotation) return;
+    final gen = ++_generation;
+    _poller?.cancel();
     state = state.copyWith(phase: ZeroCalUiPhase.runningStep2, progress: 0);
     final status =
         await ref.read(bleManagerProvider).zeroCalibrationStep2();
+    if (gen != _generation) return;
     if (status != Api2Status.ok) {
       state = ZeroCalUiState(
         phase: ZeroCalUiPhase.error,
@@ -121,10 +140,11 @@ class ZeroCalibrationNotifier extends Notifier<ZeroCalUiState> {
       );
       return;
     }
-    _startPolling();
+    _startPolling(gen);
   }
 
   Future<void> cancel() async {
+    _generation++;
     _poller?.cancel();
     await ref.read(bleManagerProvider).zeroCalibrationCancel();
     state = const ZeroCalUiState();
@@ -133,64 +153,77 @@ class ZeroCalibrationNotifier extends Notifier<ZeroCalUiState> {
   /// Returns to [ZeroCalUiPhase.idle] without touching the device — used to
   /// dismiss a success/error screen.
   void reset() {
+    _generation++;
     _poller?.cancel();
     state = const ZeroCalUiState();
   }
 
-  void _startPolling() {
+  void _startPolling(int gen) {
     _poller?.cancel();
     _pollFailures = 0;
-    _poller = Timer.periodic(_pollInterval, (_) => _poll());
+    // Deliberately not resetting _pollInFlight: if a poll from a just-ended
+    // phase is still in flight, let its own `finally` clear the flag once it
+    // resolves (and gets discarded by the generation check) rather than
+    // risking two requests for the same opcode in flight at once.
+    _poller = Timer.periodic(_pollInterval, (_) => _poll(gen));
   }
 
-  Future<void> _poll() async {
-    final status = await ref.read(bleManagerProvider).pollZeroCalibration();
-    if (status == null) {
-      _pollFailures++;
-      if (_pollFailures >= _maxConsecutivePollFailures) {
-        _poller?.cancel();
-        state = ZeroCalUiState(
-          phase: ZeroCalUiPhase.error,
-          errorMessage: _statusMessage(Api2Status.unknown),
-        );
-      }
-      return;
-    }
-    _pollFailures = 0;
+  Future<void> _poll(int gen) async {
+    if (_pollInFlight) return; // previous round trip hasn't resolved yet
+    _pollInFlight = true;
+    try {
+      final status = await ref.read(bleManagerProvider).pollZeroCalibration();
+      if (gen != _generation) return; // a newer run/cancel/reset happened
 
-    switch (status.phase) {
-      case ZeroCalPhase.step1Running:
-        state = state.copyWith(
-          phase: ZeroCalUiPhase.runningStep1,
-          progress: status.progress,
-          target: status.target,
-        );
-      case ZeroCalPhase.step1Done:
-        _poller?.cancel();
-        state = state.copyWith(
-          phase: ZeroCalUiPhase.awaitingRotation,
-          progress: status.target,
-          target: status.target,
-        );
-      case ZeroCalPhase.step2Running:
-        state = state.copyWith(
-          phase: ZeroCalUiPhase.runningStep2,
-          progress: status.progress,
-          target: status.target,
-        );
-      case ZeroCalPhase.resultReady:
-      case ZeroCalPhase.idle:
-        // The device applies step 2 within one tick (resultReady is
-        // transient) — observing idle right after runningStep2 is success.
-        if (state.phase == ZeroCalUiPhase.runningStep2) {
+      if (status == null) {
+        _pollFailures++;
+        if (_pollFailures >= _maxConsecutivePollFailures) {
           _poller?.cancel();
-          state = state.copyWith(
-            phase: ZeroCalUiPhase.success,
-            progress: status.target,
+          state = ZeroCalUiState(
+            phase: ZeroCalUiPhase.error,
+            errorMessage: _statusMessage(Api2Status.unknown),
           );
         }
-      case ZeroCalPhase.unknown:
-        break;
+        return;
+      }
+      _pollFailures = 0;
+
+      switch (status.phase) {
+        case ZeroCalPhase.step1Running:
+          state = state.copyWith(
+            phase: ZeroCalUiPhase.runningStep1,
+            progress: status.progress,
+            target: status.target,
+          );
+        case ZeroCalPhase.step1Done:
+          _poller?.cancel();
+          state = state.copyWith(
+            phase: ZeroCalUiPhase.awaitingRotation,
+            progress: status.target,
+            target: status.target,
+          );
+        case ZeroCalPhase.step2Running:
+          state = state.copyWith(
+            phase: ZeroCalUiPhase.runningStep2,
+            progress: status.progress,
+            target: status.target,
+          );
+        case ZeroCalPhase.resultReady:
+        case ZeroCalPhase.idle:
+          // The device applies step 2 within one tick (resultReady is
+          // transient) — observing idle right after runningStep2 is success.
+          if (state.phase == ZeroCalUiPhase.runningStep2) {
+            _poller?.cancel();
+            state = state.copyWith(
+              phase: ZeroCalUiPhase.success,
+              progress: status.target,
+            );
+          }
+        case ZeroCalPhase.unknown:
+          break;
+      }
+    } finally {
+      _pollInFlight = false;
     }
   }
 }
@@ -263,6 +296,12 @@ class PrecisionMeasurementNotifier extends Notifier<PrecisionUiState> {
   Timer? _poller;
   int _pollFailures = 0;
 
+  /// Guards against overlapping polls — see [ZeroCalibrationNotifier] for why.
+  bool _pollInFlight = false;
+
+  /// Bumped by [start], [cancel] and [reset]; see [ZeroCalibrationNotifier].
+  int _generation = 0;
+
   @override
   PrecisionUiState build() {
     ref.onDispose(() => _poller?.cancel());
@@ -270,9 +309,12 @@ class PrecisionMeasurementNotifier extends Notifier<PrecisionUiState> {
   }
 
   Future<void> start() async {
+    final gen = ++_generation;
+    _poller?.cancel();
     state = const PrecisionUiState(phase: PrecisionUiPhase.running);
     final status =
         await ref.read(bleManagerProvider).startPrecisionMeasurement();
+    if (gen != _generation) return; // superseded while awaiting the EXECUTE
     if (status != Api2Status.ok) {
       state = PrecisionUiState(
         phase: PrecisionUiPhase.error,
@@ -281,11 +323,11 @@ class PrecisionMeasurementNotifier extends Notifier<PrecisionUiState> {
       return;
     }
     _pollFailures = 0;
-    _poller?.cancel();
-    _poller = Timer.periodic(_pollInterval, (_) => _poll());
+    _poller = Timer.periodic(_pollInterval, (_) => _poll(gen));
   }
 
   Future<void> cancel() async {
+    _generation++;
     _poller?.cancel();
     await ref.read(bleManagerProvider).cancelPrecisionMeasurement();
     state = const PrecisionUiState();
@@ -293,49 +335,59 @@ class PrecisionMeasurementNotifier extends Notifier<PrecisionUiState> {
 
   /// Returns to [PrecisionUiPhase.idle] without touching the device.
   void reset() {
+    _generation++;
     _poller?.cancel();
     state = const PrecisionUiState();
   }
 
-  Future<void> _poll() async {
-    final status = await ref.read(bleManagerProvider).pollPrecisionMeasurement();
-    if (status == null) {
-      _pollFailures++;
-      if (_pollFailures >= _maxConsecutivePollFailures) {
-        _poller?.cancel();
-        state = PrecisionUiState(
-          phase: PrecisionUiPhase.error,
-          errorMessage: _statusMessage(Api2Status.unknown),
-        );
-      }
-      return;
-    }
-    _pollFailures = 0;
+  Future<void> _poll(int gen) async {
+    if (_pollInFlight) return; // previous round trip hasn't resolved yet
+    _pollInFlight = true;
+    try {
+      final status =
+          await ref.read(bleManagerProvider).pollPrecisionMeasurement();
+      if (gen != _generation) return; // a newer run/cancel/reset happened
 
-    switch (status.phase) {
-      case PrecisionPhase.running:
-        state = state.copyWith(
-          phase: PrecisionUiPhase.running,
-          count1: status.count1,
-          count2: status.count2,
-          target: status.target,
-          elapsedMs: status.elapsedMs,
-        );
-      case PrecisionPhase.done:
-        _poller?.cancel();
-        state = state.copyWith(
-          phase: PrecisionUiPhase.done,
-          count1: status.count1,
-          count2: status.count2,
-          target: status.target,
-          elapsedMs: status.elapsedMs,
-          timedOut: status.timedOut,
-          delta1Mm: status.delta1Mm,
-          delta2Mm: status.delta2Mm,
-        );
-      case PrecisionPhase.idle:
-      case PrecisionPhase.unknown:
-        break;
+      if (status == null) {
+        _pollFailures++;
+        if (_pollFailures >= _maxConsecutivePollFailures) {
+          _poller?.cancel();
+          state = PrecisionUiState(
+            phase: PrecisionUiPhase.error,
+            errorMessage: _statusMessage(Api2Status.unknown),
+          );
+        }
+        return;
+      }
+      _pollFailures = 0;
+
+      switch (status.phase) {
+        case PrecisionPhase.running:
+          state = state.copyWith(
+            phase: PrecisionUiPhase.running,
+            count1: status.count1,
+            count2: status.count2,
+            target: status.target,
+            elapsedMs: status.elapsedMs,
+          );
+        case PrecisionPhase.done:
+          _poller?.cancel();
+          state = state.copyWith(
+            phase: PrecisionUiPhase.done,
+            count1: status.count1,
+            count2: status.count2,
+            target: status.target,
+            elapsedMs: status.elapsedMs,
+            timedOut: status.timedOut,
+            delta1Mm: status.delta1Mm,
+            delta2Mm: status.delta2Mm,
+          );
+        case PrecisionPhase.idle:
+        case PrecisionPhase.unknown:
+          break;
+      }
+    } finally {
+      _pollInFlight = false;
     }
   }
 }

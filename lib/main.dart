@@ -8,7 +8,9 @@ import 'package:inclinometer/ble/real_ble_manager.dart';
 import 'package:inclinometer/models/device_state.dart';
 import 'package:inclinometer/providers/device_provider.dart';
 import 'package:inclinometer/ui/instrument_screen.dart';
+import 'package:inclinometer/ui/precision_measurement_screen.dart';
 import 'package:inclinometer/ui/scan_screen.dart';
+import 'package:inclinometer/ui/zero_calibration_screen.dart';
 
 // WR-02: Dispose _container when the app process is torn down by the OS.
 // WidgetsBindingObserver is the only reliable hook that fires on detach
@@ -39,9 +41,10 @@ final _router = GoRouter(
   initialLocation: '/scan',
   redirect: (context, state) {
     // Guard: only redirect to /scan if the user is trying to reach /instrument
-    // without being connected. The matchedLocation check prevents redirect loops
-    // when already on /scan (RESEARCH.md Pitfall 1).
-    if (state.matchedLocation == '/instrument' &&
+    // (or one of its zero-cal/precision sub-routes) without being connected.
+    // The matchedLocation check prevents redirect loops when already on /scan
+    // (RESEARCH.md Pitfall 1).
+    if (state.matchedLocation.startsWith('/instrument') &&
         _container.read(connectionNotifierProvider) !=
             ConnectionStatus.connected) {
       return '/scan';
@@ -56,6 +59,16 @@ final _router = GoRouter(
     GoRoute(
       path: '/instrument',
       builder: (context, state) => const InstrumentScreen(),
+      routes: [
+        GoRoute(
+          path: 'zero',
+          builder: (context, state) => const ZeroCalibrationScreen(),
+        ),
+        GoRoute(
+          path: 'precision',
+          builder: (context, state) => const PrecisionMeasurementScreen(),
+        ),
+      ],
     ),
   ],
 );

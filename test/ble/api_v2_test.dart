@@ -32,6 +32,18 @@ void main() {
       expect(opcodeCategory(op), equals(Api2Category.measurements));
       expect(opcodeResource(op), equals(0x07));
     });
+
+    test('zero-calibration / precision-measurement / live-readings opcodes',
+        () {
+      expect(opExecuteCommand(Api2CmdRes.zeroCalibration), equals(0x2106));
+      expect(
+          opExecuteCommand(Api2CmdRes.precisionMeasurement), equals(0x2107));
+      expect(opGetRaw(Api2RawRes.zeroCalStatus), equals(0x0703));
+      expect(opGetRaw(Api2RawRes.precisionStatus), equals(0x0704));
+      expect(opSubscribeTopic(Api2TopicRes.displacementRaw), equals(0x3503));
+      expect(opSubscribeMeasurement(Api2MeasRes.dispOk), equals(0x340D));
+      expect(opUnsubscribeMeasurement(Api2MeasRes.dispOk), equals(0x440D));
+    });
   });
 
   group('buildPacket / Api2Reassembler', () {
@@ -144,10 +156,68 @@ void main() {
       expect(st.rtcSet, isTrue);
     });
 
+    test('decodes a Raw (pre-smoothing) displacement topic-group payload',
+        () {
+      final d = ByteData(18)
+        ..setFloat32(0, 1.2345, Endian.little)
+        ..setFloat32(4, 0.01, Endian.little)
+        ..setFloat32(8, -0.6789, Endian.little)
+        ..setFloat32(12, -0.02, Endian.little)
+        ..setUint8(16, 1)
+        ..setUint8(17, 0);
+      final disp = Api2DisplacementRaw.decode(d.buffer.asUint8List())!;
+      expect(disp.delta1MmRaw, closeTo(1.2345, 1e-4));
+      expect(disp.residual1, closeTo(0.01, 1e-4));
+      expect(disp.delta2MmRaw, closeTo(-0.6789, 1e-4));
+      expect(disp.residual2, closeTo(-0.02, 1e-4));
+      expect(disp.quality1Ok, isTrue);
+      expect(disp.quality2Ok, isFalse);
+    });
+
+    test('decodes zero-calibration status (Raw data 0x7/0x03)', () {
+      final d = ByteData(5)
+        ..setUint8(0, ZeroCalPhase.step2Running.value)
+        ..setUint16(1, 17, Endian.little)
+        ..setUint16(3, 32, Endian.little);
+      final status = Api2ZeroCalStatus.decode(d.buffer.asUint8List())!;
+      expect(status.phase, equals(ZeroCalPhase.step2Running));
+      expect(status.progress, equals(17));
+      expect(status.target, equals(32));
+    });
+
+    test('decodes precision-measurement status (Raw data 0x7/0x04)', () {
+      final d = ByteData(20)
+        ..setUint8(0, PrecisionPhase.done.value)
+        ..setUint16(1, 64, Endian.little)
+        ..setUint16(3, 64, Endian.little)
+        ..setUint16(5, 60, Endian.little)
+        ..setUint32(7, 3150, Endian.little)
+        ..setUint8(11, 0)
+        ..setFloat32(12, 1.5, Endian.little)
+        ..setFloat32(16, -0.75, Endian.little);
+      final status = Api2PrecisionStatus.decode(d.buffer.asUint8List())!;
+      expect(status.phase, equals(PrecisionPhase.done));
+      expect(status.target, equals(64));
+      expect(status.count1, equals(64));
+      expect(status.count2, equals(60));
+      expect(status.elapsedMs, equals(3150));
+      expect(status.timedOut, isFalse);
+      expect(status.delta1Mm, closeTo(1.5, 1e-6));
+      expect(status.delta2Mm, closeTo(-0.75, 1e-6));
+    });
+
+    test('an unrecognized phase byte decodes to .unknown', () {
+      expect(ZeroCalPhase.fromByte(99), equals(ZeroCalPhase.unknown));
+      expect(PrecisionPhase.fromByte(99), equals(PrecisionPhase.unknown));
+    });
+
     test('decoders return null on a short payload', () {
       expect(Api2Environmental.decode(Uint8List(13)), isNull);
       expect(Api2DeviceStatus.decode(Uint8List(17)), isNull);
       expect(Api2Identity.decode(Uint8List(26)), isNull);
+      expect(Api2DisplacementRaw.decode(Uint8List(17)), isNull);
+      expect(Api2ZeroCalStatus.decode(Uint8List(4)), isNull);
+      expect(Api2PrecisionStatus.decode(Uint8List(19)), isNull);
     });
 
     test('decodes a 27-byte Identity payload', () {

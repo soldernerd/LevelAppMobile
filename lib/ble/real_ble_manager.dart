@@ -13,9 +13,11 @@ import 'package:inclinometer/models/device_state.dart';
 /// The link is an RN4871 Transparent-UART GATT service: requests are written
 /// to [kRxCharUuid], responses and subscription pushes arrive as
 /// notifications on [kTxCharUuid], both carrying framed API v2 packets
-/// ([api_v2.dart]). On connect the manager subscribes to the `Environmental`
-/// and `Device status` topic groups and merges their pushes into a single
-/// [DeviceState] stream.
+/// ([api_v2.dart]). On connect the manager subscribes to the `Environmental`,
+/// `Device status` and `Raw displacement` topic groups plus the `dispOk`
+/// measurement, and merges their pushes into a single [DeviceState] stream.
+/// One-shot GET/EXECUTE requests (zero calibration, precision measurement)
+/// are correlated to their response by opcode via [_request].
 class RealBleManager implements BleManager {
   RealBleManager();
 
@@ -37,6 +39,23 @@ class RealBleManager implements BleManager {
 
   Api2Environmental? _env;
   Api2DeviceStatus? _status;
+  Api2DisplacementRaw? _disp;
+  bool _dispOk = false;
+
+  /// Outstanding one-shot GET/EXECUTE requests, keyed by opcode. One-shot
+  /// traffic is atomic and non-interleaved per the API spec, so a single
+  /// completer per opcode is enough — a new request for the same opcode is
+  /// only ever issued after the previous one resolved or timed out.
+  final Map<int, Completer<Api2Frame>> _pending = {};
+
+  /// Subscription-push opcodes this manager understands, dispatched before
+  /// the one-shot request/response correlation is even considered.
+  late final Map<int, void Function(Api2Frame push)> _pushHandlers = {
+    opSubscribeTopic(Api2TopicRes.environmental): _onEnvPush,
+    opSubscribeTopic(Api2TopicRes.deviceStatus): _onStatusPush,
+    opSubscribeTopic(Api2TopicRes.displacementRaw): _onDispPush,
+    opSubscribeMeasurement(Api2MeasRes.dispOk): _onDispOkPush,
+  };
 
   @override
   Stream<ScannedDevice> get scanResults => _scanController.stream;
@@ -112,6 +131,9 @@ class RealBleManager implements BleManager {
     _reasm.reset();
     _env = null;
     _status = null;
+    _disp = null;
+    _dispOk = false;
+    _failPendingRequests();
 
     await _connStateSub?.cancel();
     _connStateSub = device.connectionState.listen((s) {
@@ -156,6 +178,15 @@ class RealBleManager implements BleManager {
         opSubscribeTopic(Api2TopicRes.environmental), _u32le(intervalMs)));
     await _send(buildPacket(
         opSubscribeTopic(Api2TopicRes.deviceStatus), _u32le(intervalMs)));
+    await _send(buildPacket(
+        opSubscribeTopic(Api2TopicRes.displacementRaw), _u32le(intervalMs)));
+    await _send(buildPacket(
+        opSubscribeMeasurement(Api2MeasRes.dispOk), _u32le(intervalMs)));
+
+    // Worked-example step 1 (docs/api-reference.md): the demod usually
+    // auto-starts at firmware boot, but confirm and start it if not — zero
+    // calibration and precision measurement both need it running.
+    unawaited(_ensureDemodRunning());
   }
 
   @override
@@ -171,6 +202,10 @@ class RealBleManager implements BleManager {
             buildPacket(opUnsubscribeTopic(Api2TopicRes.environmental)));
         await _send(
             buildPacket(opUnsubscribeTopic(Api2TopicRes.deviceStatus)));
+        await _send(
+            buildPacket(opUnsubscribeTopic(Api2TopicRes.displacementRaw)));
+        await _send(
+            buildPacket(opUnsubscribeMeasurement(Api2MeasRes.dispOk)));
       } catch (_) {
         // best effort — we're tearing down anyway
       }
@@ -185,6 +220,7 @@ class RealBleManager implements BleManager {
     } catch (_) {}
     _rxChar = null;
     _device = null;
+    _failPendingRequests();
 
     _emitStatus(ConnectionStatus.disconnected);
     _emitDevice(null);
@@ -196,12 +232,112 @@ class RealBleManager implements BleManager {
     _isScanningSub?.cancel();
     _connStateSub?.cancel();
     _notifySub?.cancel();
+    _failPendingRequests();
     _scanController.close();
     _statusController.close();
     _deviceController.close();
   }
 
+  // --- zero calibration (Commands 0x1/0x06) --------------------------------
+
+  @override
+  Future<Api2Status> zeroCalibrationStep1() async {
+    await _ensureDemodRunning();
+    return _executeCommand(Api2CmdRes.zeroCalibration, const [0x01]);
+  }
+
+  @override
+  Future<Api2Status> zeroCalibrationStep2() =>
+      _executeCommand(Api2CmdRes.zeroCalibration, const [0x02]);
+
+  @override
+  Future<Api2Status> zeroCalibrationCancel() =>
+      _executeCommand(Api2CmdRes.zeroCalibration, const [0x00]);
+
+  @override
+  Future<Api2ZeroCalStatus?> pollZeroCalibration() async {
+    final frame = await _tryRequest(opGetRaw(Api2RawRes.zeroCalStatus));
+    if (frame == null || !frame.isOk) return null;
+    return Api2ZeroCalStatus.decode(frame.data);
+  }
+
+  // --- triggered precision measurement (Commands 0x1/0x07) -----------------
+
+  @override
+  Future<Api2Status> startPrecisionMeasurement() async {
+    await _ensureDemodRunning();
+    return _executeCommand(Api2CmdRes.precisionMeasurement, const [0x00]);
+  }
+
+  @override
+  Future<Api2Status> cancelPrecisionMeasurement() =>
+      _executeCommand(Api2CmdRes.precisionMeasurement, const [0x01]);
+
+  @override
+  Future<Api2PrecisionStatus?> pollPrecisionMeasurement() async {
+    final frame = await _tryRequest(opGetRaw(Api2RawRes.precisionStatus));
+    if (frame == null || !frame.isOk) return null;
+    return Api2PrecisionStatus.decode(frame.data);
+  }
+
   // --- internals ----------------------------------------------------------
+
+  /// `GET 0x4/0x0D` (dispOk); if false, `EXECUTE 0x1/0x01` payload `1` to
+  /// start the demod. Best-effort — failures surface as BUSY_RESOURCE on the
+  /// zero-cal/precision EXECUTE that follows, so errors here are swallowed.
+  Future<void> _ensureDemodRunning() async {
+    try {
+      final frame = await _tryRequest(opGetMeasurement(Api2MeasRes.dispOk));
+      final ok = frame != null && frame.isOk && frame.data.isNotEmpty && frame.data[0] != 0;
+      if (!ok) {
+        await _executeCommand(Api2CmdRes.displacementDemod, const [0x01]);
+      }
+    } catch (_) {
+      // Swallowed — the subsequent EXECUTE reports BUSY_RESOURCE if this
+      // didn't actually get the demod running.
+    }
+  }
+
+  Future<Api2Status> _executeCommand(int resource, List<int> payload) async {
+    final frame = await _tryRequest(opExecuteCommand(resource), payload: payload);
+    if (frame == null) return Api2Status.unknown;
+    return frame.crcOk ? frame.status : Api2Status.unknown;
+  }
+
+  /// Like [_request] but never throws — returns null on timeout, a missing
+  /// connection, or any other comms failure, so pollers can just retry.
+  Future<Api2Frame?> _tryRequest(int opcode, {List<int> payload = const []}) async {
+    try {
+      return await _request(opcode, payload: payload);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Api2Frame> _request(
+    int opcode, {
+    List<int> payload = const [],
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
+    if (_rxChar == null) {
+      throw StateError('not connected');
+    }
+    final completer = Completer<Api2Frame>();
+    _pending[opcode] = completer;
+    await _send(buildPacket(opcode, payload));
+    try {
+      return await completer.future.timeout(timeout);
+    } finally {
+      _pending.remove(opcode);
+    }
+  }
+
+  void _failPendingRequests() {
+    for (final c in _pending.values) {
+      if (!c.isCompleted) c.completeError(StateError('disconnected'));
+    }
+    _pending.clear();
+  }
 
   void _handleInvoluntaryDisconnect() {
     _connected = false;
@@ -211,6 +347,7 @@ class RealBleManager implements BleManager {
     _connStateSub = null;
     _rxChar = null;
     _device = null;
+    _failPendingRequests();
     _emitStatus(ConnectionStatus.disconnected);
     _emitDevice(null);
   }
@@ -236,28 +373,20 @@ class RealBleManager implements BleManager {
   }
 
   void _dispatch(Api2Frame frame) {
-    // Topic-group pushes echo the SUBSCRIBE opcode; the ack that precedes them
-    // is status-only (empty data), so a non-empty payload is a real push.
-    final envOp = opSubscribeTopic(Api2TopicRes.environmental);
-    final statusOp = opSubscribeTopic(Api2TopicRes.deviceStatus);
-
-    if (frame.opcode == envOp || frame.opcode == opGetTopic(Api2TopicRes.environmental)) {
+    // Subscription pushes echo the SUBSCRIBE opcode; the ack that precedes
+    // them is status-only (empty data), so a non-empty payload is a real
+    // push — a matching handler here always wins over request correlation
+    // below, since a SUBSCRIBE opcode is never awaited via [_request].
+    final pushHandler = _pushHandlers[frame.opcode];
+    if (pushHandler != null) {
       final push = frame.asPush();
-      final env = Api2Environmental.decode(push.data);
-      if (env != null) {
-        _env = env;
-        _emitDevice(_merge());
-      }
+      if (push.data.isNotEmpty) pushHandler(push);
       return;
     }
 
-    if (frame.opcode == statusOp || frame.opcode == opGetTopic(Api2TopicRes.deviceStatus)) {
-      final push = frame.asPush();
-      final st = Api2DeviceStatus.decode(push.data);
-      if (st != null) {
-        _status = st;
-        _emitDevice(_merge());
-      }
+    final pending = _pending.remove(frame.opcode);
+    if (pending != null && !pending.isCompleted) {
+      pending.complete(frame);
       return;
     }
 
@@ -273,10 +402,47 @@ class RealBleManager implements BleManager {
     }
   }
 
+  void _onEnvPush(Api2Frame push) {
+    final env = Api2Environmental.decode(push.data);
+    if (env != null) {
+      _env = env;
+      _emitDevice(_merge());
+    }
+  }
+
+  void _onStatusPush(Api2Frame push) {
+    final st = Api2DeviceStatus.decode(push.data);
+    if (st != null) {
+      _status = st;
+      _emitDevice(_merge());
+    }
+  }
+
+  void _onDispPush(Api2Frame push) {
+    final disp = Api2DisplacementRaw.decode(push.data);
+    if (disp != null) {
+      _disp = disp;
+      _emitDevice(_merge());
+    }
+  }
+
+  void _onDispOkPush(Api2Frame push) {
+    _dispOk = push.data[0] != 0;
+    _emitDevice(_merge());
+  }
+
   DeviceState _merge() {
     final st = _status;
     final env = _env;
+    final disp = _disp;
     return DeviceState(
+      displacementS1Mm: disp?.delta1MmRaw,
+      displacementS2Mm: disp?.delta2MmRaw,
+      residualS1: disp?.residual1,
+      residualS2: disp?.residual2,
+      displacementOk: _dispOk,
+      quality1Ok: disp?.quality1Ok ?? true,
+      quality2Ok: disp?.quality2Ok ?? true,
       batteryPercent: st?.batterySocPct ?? 0,
       batteryMillivolts: st?.batteryMv ?? 0,
       batteryState: st?.batteryState ?? BatteryState.unknown,

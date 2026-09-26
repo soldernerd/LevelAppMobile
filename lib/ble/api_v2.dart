@@ -72,6 +72,8 @@ class Api2SysRes {
 class Api2TopicRes {
   static const int environmental = 0x00; // 14-byte payload
   static const int deviceStatus = 0x01; // 18-byte payload
+  static const int displacementPhasors = 0x02; // 32-byte payload, bench/diagnostic
+  static const int displacementRaw = 0x03; // 18-byte payload — live readings feed
 }
 
 /// Measurement (0x4) resource indices.
@@ -85,13 +87,29 @@ class Api2MeasRes {
   static const int bme280Ok = 0x06; // u8 0/1
   static const int externalTemp = 0x07; // i16 centi-°C
   static const int externalTempOk = 0x08; // u8 0/1
+  static const int dispS1Delta = 0x09; // f32 mm, post-moving-average
+  static const int dispS1Residual = 0x0A; // f32, Im(x1)
+  static const int dispS2Delta = 0x0B; // f32 mm, post-moving-average
+  static const int dispS2Residual = 0x0C; // f32, Im(x2)
+  static const int dispOk = 0x0D; // u8 0/1 — 0x09-0x0C meaningless while 0
 }
 
 /// Command (0x1) resource indices — EXECUTE only.
 class Api2CmdRes {
   static const int testBeep = 0x00; // no payload
-  static const int signalAnalysis = 0x01; // 1 byte: 0 stop / 1 start
+  static const int displacementDemod = 0x01; // 1 byte: 0 stop / 1 start
   static const int forceCharge = 0x02; // no payload
+  static const int zeroCalibration = 0x06; // 1 byte: 0 cancel / 1 step1 / 2 step2
+  static const int precisionMeasurement = 0x07; // 1 byte: 0 start / 1 cancel
+}
+
+/// Raw data (0x7) resource indices — GET only in this firmware build.
+class Api2RawRes {
+  static const int adcDiag = 0x00;
+  static const int powerTest = 0x01;
+  static const int displacementDiag = 0x02;
+  static const int zeroCalStatus = 0x03; // 5-byte payload
+  static const int precisionStatus = 0x04; // 20-byte payload
 }
 
 int opGetIdentity() =>
@@ -109,9 +127,13 @@ int opGetMeasurement(int res) =>
     opcode(Api2Verb.get, Api2Category.measurements, res);
 int opSubscribeMeasurement(int res) =>
     opcode(Api2Verb.subscribe, Api2Category.measurements, res);
+int opUnsubscribeMeasurement(int res) =>
+    opcode(Api2Verb.unsubscribe, Api2Category.measurements, res);
 
 int opExecuteCommand(int res) =>
     opcode(Api2Verb.execute, Api2Category.commands, res);
+
+int opGetRaw(int res) => opcode(Api2Verb.get, Api2Category.rawData, res);
 
 // ---------------------------------------------------------------------------
 // Status codes (first byte of every response payload)
@@ -456,6 +478,166 @@ class Api2DeviceStatus {
       rtcMinute: d[15],
       rtcSecond: d[16],
       rtcSet: d[17] != 0,
+    );
+  }
+}
+
+/// Decoded `Topic groups / Raw (pre-smoothing) displacement` payload
+/// (`0x5/0x03`, 18 bytes) — the live-readings feed. Valid only while
+/// Measurements `0x4/0x0D` (dispOk) is true.
+class Api2DisplacementRaw {
+  const Api2DisplacementRaw({
+    required this.delta1MmRaw,
+    required this.residual1,
+    required this.delta2MmRaw,
+    required this.residual2,
+    required this.quality1Ok,
+    required this.quality2Ok,
+  });
+
+  final double delta1MmRaw;
+  final double residual1;
+  final double delta2MmRaw;
+  final double residual2;
+
+  /// False flags this batch's [delta1MmRaw] as a statistically-likely glitch
+  /// (a real jump/step in the residual) — a soft warning, not a hard error.
+  final bool quality1Ok;
+  final bool quality2Ok;
+
+  static Api2DisplacementRaw? decode(Uint8List d) {
+    if (d.length < 18) return null;
+    final bd = ByteData.sublistView(d);
+    return Api2DisplacementRaw(
+      delta1MmRaw: bd.getFloat32(0, Endian.little),
+      residual1: bd.getFloat32(4, Endian.little),
+      delta2MmRaw: bd.getFloat32(8, Endian.little),
+      residual2: bd.getFloat32(12, Endian.little),
+      quality1Ok: d[16] != 0,
+      quality2Ok: d[17] != 0,
+    );
+  }
+}
+
+/// Zero-calibration progress phase (`GET 0x7/0x03`, byte 0).
+///
+/// The device applies the step-2 result within one scheduler tick, so a host
+/// polling slower than that will normally see [step2Running] followed
+/// directly by [idle] — [resultReady] is transient and easy to miss by
+/// design; treat "was step2Running, now idle" as success.
+enum ZeroCalPhase {
+  idle(0),
+  step1Running(1),
+  step1Done(2),
+  step2Running(3),
+  resultReady(4),
+  unknown(0xFF);
+
+  const ZeroCalPhase(this.value);
+
+  final int value;
+
+  static ZeroCalPhase fromByte(int b) {
+    for (final p in ZeroCalPhase.values) {
+      if (p.value == b) return p;
+    }
+    return ZeroCalPhase.unknown;
+  }
+}
+
+/// Decoded `GET 0x7/0x03` — Zero-calibration status (5 bytes).
+class Api2ZeroCalStatus {
+  const Api2ZeroCalStatus({
+    required this.phase,
+    required this.progress,
+    required this.target,
+  });
+
+  final ZeroCalPhase phase;
+
+  /// Batches averaged so far in the current step; 0 while idle/between steps.
+  final int progress;
+
+  /// Always 32 in this firmware build — the sample count for one zero-cal step.
+  final int target;
+
+  static Api2ZeroCalStatus? decode(Uint8List d) {
+    if (d.length < 5) return null;
+    final bd = ByteData.sublistView(d);
+    return Api2ZeroCalStatus(
+      phase: ZeroCalPhase.fromByte(d[0]),
+      progress: bd.getUint16(1, Endian.little),
+      target: bd.getUint16(3, Endian.little),
+    );
+  }
+}
+
+/// Triggered precision-measurement progress phase (`GET 0x7/0x04`, byte 0).
+enum PrecisionPhase {
+  idle(0),
+  running(1),
+  done(2),
+  unknown(0xFF);
+
+  const PrecisionPhase(this.value);
+
+  final int value;
+
+  static PrecisionPhase fromByte(int b) {
+    for (final p in PrecisionPhase.values) {
+      if (p.value == b) return p;
+    }
+    return PrecisionPhase.unknown;
+  }
+}
+
+/// Decoded `GET 0x7/0x04` — Precision-measurement status (20 bytes).
+class Api2PrecisionStatus {
+  const Api2PrecisionStatus({
+    required this.phase,
+    required this.target,
+    required this.count1,
+    required this.count2,
+    required this.elapsedMs,
+    required this.timedOut,
+    required this.delta1Mm,
+    required this.delta2Mm,
+  });
+
+  final PrecisionPhase phase;
+
+  /// Always 64 in this firmware build.
+  final int target;
+
+  /// Quality-good batches averaged so far, per sensor (0..[target]).
+  final int count1;
+  final int count2;
+
+  /// Wall-clock time since the triggering EXECUTE; 0 while idle.
+  final int elapsedMs;
+
+  /// True if the 4000 ms ceiling was hit before both sensors reached
+  /// [target]. Only meaningful once [phase] is [PrecisionPhase.done] — the
+  /// result is still the mean of whatever was collected, not a hard failure.
+  final bool timedOut;
+
+  /// Mean of the [count1] batches actually collected. Valid once
+  /// [phase] == [PrecisionPhase.done]; 0 before that.
+  final double delta1Mm;
+  final double delta2Mm;
+
+  static Api2PrecisionStatus? decode(Uint8List d) {
+    if (d.length < 20) return null;
+    final bd = ByteData.sublistView(d);
+    return Api2PrecisionStatus(
+      phase: PrecisionPhase.fromByte(d[0]),
+      target: bd.getUint16(1, Endian.little),
+      count1: bd.getUint16(3, Endian.little),
+      count2: bd.getUint16(5, Endian.little),
+      elapsedMs: bd.getUint32(7, Endian.little),
+      timedOut: d[11] != 0,
+      delta1Mm: bd.getFloat32(12, Endian.little),
+      delta2Mm: bd.getFloat32(16, Endian.little),
     );
   }
 }

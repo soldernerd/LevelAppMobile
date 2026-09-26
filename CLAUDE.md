@@ -7,7 +7,7 @@ instrument (STM32G0B1 / RN4871). The scaffold was built mock-first (phases
 **Package:** `com.soldernerd.inclinometer`
 **Platform:** Android primary (iOS scaffold included, not tested)
 
-## Device reality (REV B firmware, `master`)
+## Device reality (REV B firmware, fw 0.10.x, `master`)
 
 The firmware is `InclinationMeterFirmware` (repo also named "WylerLeveltronic").
 See its `docs/api-reference.md` for the authoritative contract.
@@ -19,16 +19,28 @@ See its `docs/api-reference.md` for the authoritative contract.
 - **GATT:** service `49535343-FE7D-4AE5-8FA9-9FAFD205E455`; write requests to
   `…8841-…`; enable notifications on `…1E4D-…`. Advertises as
   `Leveltronic-<last 2 MAC bytes>`.
-- **Data the app uses:** topic groups `Environmental` (0x5/0x00) and
-  `Device status` (0x5/0x01), subscribed at connect. Yields battery mV / SoC /
-  state, on-board + external + BME280 temperature, humidity, pressure,
-  USB/charge flags.
-- **No tilt.** REV B has no angle output (analog-AFE tilt math is unfinished;
-  the REV A SCL3300 path was removed). `DeviceState.angleX/angleY` stay null
-  and the instrument screen shows a permanent "not available" placeholder.
-  Wiring a future firmware tilt Measurement resource is a small change in
-  `RealBleManager._dispatch` + `_merge`.
-- **No zero command** in this firmware build.
+- **Live readings = displacement, not a single tilt angle.** The instrument
+  measures two capacitive sensors (S1/S2), mm, via a WP10 analog front-end +
+  demod. `RealBleManager` subscribes `Environmental` (0x5/0x00), `Device
+  status` (0x5/0x01), `Raw displacement` (0x5/0x03) and the `dispOk`
+  measurement (0x4/0x0D) at connect, and merges them into `DeviceState`.
+  `displacementS1Mm`/`displacementS2Mm` are only meaningful while
+  `displacementOk` is true (the demod is running) — `RealBleManager` confirms/
+  starts it on connect (`_ensureDemodRunning`, `Commands 0x1/0x01`).
+- **Zero calibration** (`Commands 0x1/0x06`) is the classic 180° reversal
+  test: EXECUTE payload `1` (step 1, measure), rotate, EXECUTE payload `2`
+  (step 2, measure + persist new offset to the instrument's own EEPROM).
+  Not subscribable — poll `GET Raw data 0x7/0x03` for phase/progress. Driven
+  by `ZeroCalibrationNotifier` (`lib/providers/measurement_provider.dart`) /
+  `ZeroCalibrationScreen`.
+- **Triggered precision measurement** (`Commands 0x1/0x07`) averages up to 64
+  quality-good batches per sensor (~3.2 s typical, 4 s ceiling) and reports
+  one repeatable value — not written to EEPROM. Poll `GET Raw data 0x7/0x04`.
+  Driven by `PrecisionMeasurementNotifier` / `PrecisionMeasurementScreen`.
+- Both triggered flows use `RealBleManager._request()` — a per-opcode
+  `Completer` map correlating a GET/EXECUTE to its response, distinct from
+  the fire-and-forget subscription-push path (`_pushHandlers`). Polling lives
+  in the Riverpod notifiers (`Timer.periodic`, ~200 ms), not in the manager.
 
 ## Planning
 

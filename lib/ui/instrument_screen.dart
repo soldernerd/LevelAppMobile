@@ -8,14 +8,15 @@ import 'package:inclinometer/providers/device_provider.dart';
 
 /// Instrument screen shown after a successful BLE connection.
 ///
-/// Shows the live measurements this firmware build actually exposes —
-/// battery voltage / state, on-board + external + ambient temperature,
-/// humidity and pressure — plus a tilt placeholder (REV B has no angle
-/// output yet). Values grey out and a DISCONNECTED badge appears when the
-/// data goes stale.
+/// Shows the live displacement readings (S1/S2, mm — the instrument's core
+/// "live readings" value), plus battery voltage/state and on-board/external/
+/// ambient temperature, humidity and pressure. Values grey out and a
+/// DISCONNECTED badge appears when the data goes stale. "Zero Calibration"
+/// and "Measure" open the two triggered-action flows.
 ///
 /// Architecture: no `flutter_blue_plus` import here. All BLE actions go
-/// through [connectionNotifierProvider.notifier].
+/// through [connectionNotifierProvider.notifier] or [bleManagerProvider]
+/// (via the measurement notifiers) — never directly from this widget.
 class InstrumentScreen extends ConsumerWidget {
   const InstrumentScreen({super.key});
 
@@ -39,6 +40,7 @@ class InstrumentScreen extends ConsumerWidget {
     final isActiveConnection = status == ConnectionStatus.connected ||
         status == ConnectionStatus.connecting ||
         status == ConnectionStatus.reconnecting;
+    final isConnected = status == ConnectionStatus.connected;
 
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
@@ -84,7 +86,7 @@ class InstrumentScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _TiltPlaceholder(),
+                    _LiveReadings(state: d),
                     if (isStale)
                       const Padding(
                         padding: EdgeInsets.only(top: 12, bottom: 4),
@@ -99,6 +101,30 @@ class InstrumentScreen extends ConsumerWidget {
                           ),
                         ),
                       ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: isConnected
+                                ? () => context.push('/instrument/zero')
+                                : null,
+                            icon: const Icon(Icons.restart_alt),
+                            label: const Text('Zero Calibration'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: isConnected
+                                ? () => context.push('/instrument/precision')
+                                : null,
+                            icon: const Icon(Icons.center_focus_strong),
+                            label: const Text('Measure'),
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 16),
                     _SectionLabel('Battery'),
                     _ReadoutTile(
@@ -168,11 +194,17 @@ class InstrumentScreen extends ConsumerWidget {
   }
 }
 
-/// Large tilt readout, permanently showing "not available" until a firmware
-/// build exposes an angle Measurement resource.
-class _TiltPlaceholder extends StatelessWidget {
+/// Live displacement readout — the instrument's core "live readings" value.
+/// Two sensors (S1/S2), mm, updated continuously while [DeviceState.displacementOk]
+/// is true; greyed placeholders otherwise (demod not running yet).
+class _LiveReadings extends StatelessWidget {
+  const _LiveReadings({required this.state});
+
+  final DeviceState? state;
+
   @override
   Widget build(BuildContext context) {
+    final ok = state?.displacementOk ?? false;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
       decoration: BoxDecoration(
@@ -182,37 +214,79 @@ class _TiltPlaceholder extends StatelessWidget {
       ),
       child: Column(
         children: [
-          for (final axis in const ['X', 'Y'])
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(axis,
-                      style: const TextStyle(
-                          fontSize: 28, color: Colors.white38)),
-                  const Text(
-                    '––.––°',
-                    style: TextStyle(
-                      fontSize: 48,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white38,
-                      fontFeatures: [FontFeature.tabularFigures()],
-                      height: 1.0,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-              ),
-            ),
-          const SizedBox(height: 8),
-          const Text(
-            'Tilt readout not available on this firmware build',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: Colors.white30),
+          _DisplacementRow(
+            label: 'S1',
+            valueMm: state?.displacementS1Mm,
+            ok: ok,
+            qualityOk: state?.quality1Ok ?? true,
           ),
+          const SizedBox(height: 4),
+          _DisplacementRow(
+            label: 'S2',
+            valueMm: state?.displacementS2Mm,
+            ok: ok,
+            qualityOk: state?.quality2Ok ?? true,
+          ),
+          if (!ok) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'Live readings not available — sensor not running',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: Colors.white30),
+            ),
+          ],
         ],
       ),
+    );
+  }
+}
+
+class _DisplacementRow extends StatelessWidget {
+  const _DisplacementRow({
+    required this.label,
+    required this.valueMm,
+    required this.ok,
+    required this.qualityOk,
+  });
+
+  final String label;
+  final double? valueMm;
+  final bool ok;
+  final bool qualityOk;
+
+  @override
+  Widget build(BuildContext context) {
+    final show = ok && valueMm != null;
+    final color = !show
+        ? Colors.white38
+        : (qualityOk ? Colors.white : const Color(0xFFFFA000));
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label,
+            style: const TextStyle(fontSize: 28, color: Colors.white38)),
+        Row(
+          children: [
+            if (show && !qualityOk)
+              const Padding(
+                padding: EdgeInsets.only(right: 6),
+                child: Icon(Icons.warning_amber_rounded,
+                    size: 18, color: Color(0xFFFFA000)),
+              ),
+            Text(
+              show ? '${_fmtDisplacement(valueMm!)} mm' : '––.––– mm',
+              style: TextStyle(
+                fontSize: 40,
+                fontWeight: FontWeight.w700,
+                color: color,
+                fontFeatures: const [FontFeature.tabularFigures()],
+                height: 1.0,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -289,6 +363,9 @@ class _ReadoutTile extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Formatting helpers
 // ---------------------------------------------------------------------------
+
+String _fmtDisplacement(double v) =>
+    '${v >= 0 ? '+' : '−'}${v.abs().toStringAsFixed(3)}';
 
 String _fmtTemp(double? c) =>
     c == null ? '—' : '${c >= 0 ? '+' : '−'}${c.abs().toStringAsFixed(2)} °C';

@@ -1,5 +1,5 @@
-// Widget tests for InstrumentScreen — real-measurement readouts, tilt
-// placeholder, connection chip, and stale-data behaviour.
+// Widget tests for InstrumentScreen — live displacement readings,
+// real-measurement readouts, connection chip, and stale-data behaviour.
 
 import 'dart:async';
 
@@ -48,6 +48,11 @@ Future<void> _setWideSurface(WidgetTester tester) async {
 }
 
 DeviceState _state({
+  double? displacementS1Mm = 1.234,
+  double? displacementS2Mm = -0.567,
+  bool displacementOk = true,
+  bool quality1Ok = true,
+  bool quality2Ok = true,
   int batteryPercent = 80,
   int batteryMillivolts = 4020,
   BatteryState batteryState = BatteryState.normal,
@@ -60,6 +65,11 @@ DeviceState _state({
   bool charging = false,
 }) {
   return DeviceState(
+    displacementS1Mm: displacementS1Mm,
+    displacementS2Mm: displacementS2Mm,
+    displacementOk: displacementOk,
+    quality1Ok: quality1Ok,
+    quality2Ok: quality2Ok,
     batteryPercent: batteryPercent,
     batteryMillivolts: batteryMillivolts,
     batteryState: batteryState,
@@ -107,8 +117,7 @@ void main() {
     expect(find.text('75%'), findsOneWidget);
   });
 
-  testWidgets('tilt readout is a permanent "not available" placeholder',
-      (tester) async {
+  testWidgets('shows live S1/S2 displacement readings', (tester) async {
     await _setWideSurface(tester);
     await tester.pumpWidget(buildInstrumentApp(
       mock: MockBleManager(),
@@ -116,13 +125,69 @@ void main() {
     ));
     await tester.pump(const Duration(milliseconds: 50));
 
+    expect(find.text('+1.234 mm'), findsOneWidget);
+    expect(find.text('−0.567 mm'), findsOneWidget); // U+2212
     expect(
-      find.text('Tilt readout not available on this firmware build'),
+      find.text('Live readings not available — sensor not running'),
+      findsNothing,
+    );
+  });
+
+  testWidgets(
+      'shows a placeholder and "not available" note when displacement is not ok',
+      (tester) async {
+    await _setWideSurface(tester);
+    await tester.pumpWidget(buildInstrumentApp(
+      mock: MockBleManager(),
+      dataStream: _single(_state(displacementOk: false)),
+    ));
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(find.text('––.––– mm'), findsNWidgets(2));
+    expect(
+      find.text('Live readings not available — sensor not running'),
       findsOneWidget,
     );
-    // No Zero buttons any more.
-    expect(find.widgetWithText(ElevatedButton, 'Zero X'), findsNothing);
-    expect(find.widgetWithText(ElevatedButton, 'Zero Y'), findsNothing);
+  });
+
+  testWidgets('Zero Calibration and Measure actions are enabled when connected',
+      (tester) async {
+    await _setWideSurface(tester);
+    await tester.pumpWidget(buildInstrumentApp(
+      mock: MockBleManager(),
+      initialStatus: ConnectionStatus.connected,
+      dataStream: _single(_state()),
+    ));
+    await tester.pump(const Duration(milliseconds: 50));
+
+    final zeroBtn = tester.widget<OutlinedButton>(
+      find.widgetWithText(OutlinedButton, 'Zero Calibration'),
+    );
+    final measureBtn = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Measure'),
+    );
+    expect(zeroBtn.onPressed, isNotNull);
+    expect(measureBtn.onPressed, isNotNull);
+  });
+
+  testWidgets(
+      'Zero Calibration and Measure actions are disabled when not connected',
+      (tester) async {
+    await _setWideSurface(tester);
+    await tester.pumpWidget(buildInstrumentApp(
+      mock: MockBleManager(),
+      initialStatus: ConnectionStatus.disconnected,
+    ));
+    await tester.pump();
+
+    final zeroBtn = tester.widget<OutlinedButton>(
+      find.widgetWithText(OutlinedButton, 'Zero Calibration'),
+    );
+    final measureBtn = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Measure'),
+    );
+    expect(zeroBtn.onPressed, isNull);
+    expect(measureBtn.onPressed, isNull);
   });
 
   testWidgets('missing optional fields render as an em dash', (tester) async {

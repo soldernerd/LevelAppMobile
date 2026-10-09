@@ -182,9 +182,11 @@ class ScanScreen extends ConsumerWidget {
             children: [
               if (devices.isNotEmpty) _buildDeviceList(ref, devices),
               const SizedBox(height: 16),
-              const Text(
-                'Could not start scan. Check Bluetooth is enabled.',
-                style: TextStyle(fontSize: 13, color: Colors.white70),
+              Text(
+                ref.watch(connectionErrorProvider) ??
+                    'Could not start scan. Check Bluetooth is enabled.',
+                key: const ValueKey('scan-error'),
+                style: const TextStyle(fontSize: 13, color: Colors.white70),
                 textAlign: TextAlign.center,
               ),
             ],

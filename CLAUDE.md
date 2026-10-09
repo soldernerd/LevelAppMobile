@@ -7,50 +7,65 @@ instrument (STM32G0B1 / RN4871). The scaffold was built mock-first (phases
 **Package:** `com.soldernerd.inclinometer`
 **Platform:** Android primary (iOS scaffold included, not tested)
 
-## Device reality (REV B firmware, fw 0.10.x, `master`)
+## Device reality (firmware 0.11+, API v3)
 
 The firmware is `InclinationMeterFirmware` (repo also named "WylerLeveltronic").
-See its `docs/api-reference.md` for the authoritative contract.
+**Protocol:** its `docs/api-v3-spec.md`; **every resource:** its
+`docs/api-reference.md` (generated from `tools/api_spec.py`). The app speaks
+API v3 only — `BleManager.connect` reads System IDENTITY and refuses anything
+else (`IncompatibleFirmwareException`, shown on the scan screen).
 
-- **Transport:** RN4871 **Transparent UART** — a raw byte stream, *not* plain
-  GATT state/command characteristics. It carries framed **API v2** packets:
-  `[OPCODE 2B LE][LEN 2B LE][PAYLOAD][CRC16 2B LE]`, CRC-16/CCITT-FALSE over
-  `OPCODE+LEN+PAYLOAD`. See `lib/ble/api_v2.dart`.
-- **GATT:** service `49535343-FE7D-4AE5-8FA9-9FAFD205E455`; write requests to
-  `…8841-…`; enable notifications on `…1E4D-…`. Advertises as
-  `Leveltronic-<last 2 MAC bytes>`.
-- **Live readings = displacement, not a single tilt angle.** The instrument
-  measures two capacitive sensors (S1/S2), mm, via a WP10 analog front-end +
-  demod. `RealBleManager` subscribes `Environmental` (0x5/0x00), `Device
-  status` (0x5/0x01), `Raw displacement` (0x5/0x03) and the `dispOk`
-  measurement (0x4/0x0D) at connect, and merges them into `DeviceState`.
-  `displacementS1Mm`/`displacementS2Mm` are only meaningful while
-  `displacementOk` is true (the demod is running) — `RealBleManager` confirms/
-  starts it on connect (`_ensureDemodRunning`, `Commands 0x1/0x01`).
-- **Zero calibration** (`Commands 0x1/0x06`) is the classic 180° reversal
-  test: EXECUTE payload `1` (step 1, measure), rotate, EXECUTE payload `2`
-  (step 2, measure + persist new offset to the instrument's own EEPROM).
-  Not subscribable — poll `GET Raw data 0x7/0x03` for phase/progress. Driven
-  by `ZeroCalibrationNotifier` (`lib/providers/measurement_provider.dart`) /
-  `ZeroCalibrationScreen`.
-- **Triggered precision measurement** (`Commands 0x1/0x07`) averages up to 64
-  quality-good batches per sensor (~3.2 s typical, 4 s ceiling) and reports
-  one repeatable value — not written to EEPROM. Poll `GET Raw data 0x7/0x04`.
-  Driven by `PrecisionMeasurementNotifier` / `PrecisionMeasurementScreen`.
-- Both triggered flows use `RealBleManager._request()` — a per-opcode
-  `Completer` map correlating a GET/EXECUTE to its response, distinct from
-  the fire-and-forget subscription-push path (`_pushHandlers`). Polling lives
-  in the Riverpod notifiers (`Timer.periodic`, ~200 ms), not in the manager.
-- **Poll-loop race, fixed once already — don't reintroduce it.** A poll
-  notifier must never have two requests for the same opcode in flight at
-  once (`_pollInFlight` guard in both notifiers) and must discard a response
-  that resolves after `cancel()`/`reset()`/a fresh `start()` moved on (the
-  `_generation` counter, checked right after the `await`). Without both,
-  a slow/dropped round trip lets a later request silently steal an earlier
-  one's completer in `RealBleManager._pending` (or vice versa), which showed
-  up as sparse progress updates and a spurious "lost contact" error arriving
-  *after* a correct result was already displayed. Regression tests:
-  `test/providers/measurement_provider_test.dart`'s "stale poll" cases.
+- **Transport:** RN4871 **Transparent UART** — a raw byte stream carrying
+  framed packets `[OPCODE 2B LE][LEN 2B LE][PAYLOAD][CRC16 2B LE]`,
+  CRC-16/CCITT-FALSE. Service `49535343-FE7D-…`, write `…8841-…`, notify
+  `…1E4D-…`; advertises as `Leveltronic-<last 2 MAC bytes>`. Max payload 122.
+- **Layering (keep it):**
+  `lib/ble/api_v3.dart` (framing, opcodes, decoders; pure Dart) →
+  `device_link.dart` (`DeviceLink`: `request()` + `subscribe()`) →
+  `instrument_api.dart` (typed operations) →
+  `live_feed.dart` (the always-on subscriptions) → providers → screens.
+  `RealBleManager` is only a `DeviceLink` over `flutter_blue_plus`;
+  `MockBleManager` puts `SimulatedDevice` behind the same link.
+- **Subscriptions, not polling.** `DeviceLink.subscribe` shares one device
+  subscription between listeners and UNSUBSCRIBEs when the last leaves.
+  Always on: Topics LIVE (event, ~4 Hz), STATUS (1 s), ENV (2 s). Per screen:
+  Procedures ZERO_CAL / PRECISION (pushed on change and ~4 Hz while running),
+  Topics SIGNAL_DIAG, Topics PHASOR_STREAM (phase calibration only). The only
+  polls left are RTC (1 s) and HEALTH (5 s) on the "All values" screen, and a
+  1 s fallback GET inside `PrecisionRun` if a push is lost.
+- **Live readings** are tilt in **mm/m** (S1, S2, Diff = S1 − S2), valid while
+  LIVE flags bit0 is set; bits 1/2 mark a sensor "doubtful" (vibration).
+- **Service mode** gates every calibration write and the maintenance commands
+  (ZERO_CAL, FACTORY_DEFAULTS, REBOOT_DFU, …) with status `0x0B`. It can only be
+  switched on **at the instrument** (SETTINGS → Service mode, right knob twice);
+  the app shows it (STATUS `service_mode`), can end it (SERVICE_END), and sends
+  a cheap request every 30 s while a wizard is open
+  (`serviceKeepAliveProvider`) because it ends after 10 minutes without one.
+- **Zero Diff** is app-side (`tareProvider`, per serial in SharedPreferences):
+  the firmware has no such function and moving S1_ZERO/S2_ZERO would change S1
+  and S2 too.
+- **Calibration wizards** (`lib/providers/*_cal_provider.dart`, math in
+  `lib/calibration/calibration_math.dart`, all tested end to end against the
+  simulator's known truth):
+  - *Flip (zero)*: Commands ZERO_CAL step 1 → user turns 180° → step 2 →
+    firmware stores the zero; the app shows zero before/after.
+  - *Phase*: capture the phasor stream flat and with a tilt step; with
+    `u = S/(A−B)` the direction of Δu is the sensor's signal phase (folded to
+    ±90°, must be within ±45°). Independent of the stored phase and of the
+    step size.
+  - *Gain (k)*: two precision measurements (baseline, known shim);
+    `kNew = kOld·|Δreading| / tilt`, tilt = shim ÷ edge × 1000 mm/m; then
+    re-measures to prove it. Recommended order: phase → gain → zero.
+- **Settings** page is data-driven from `lib/ble/api_catalog.dart`. Settings
+  0x53 (max minutes at 100 %) is *optional*: it is reserved for the
+  drift-probe branch and is hidden unless a GET answers.
+- **Fake-async gotcha (tests):** never `await` a `StreamSubscription.cancel()`
+  in code that tests drive with `fakeAsync` — its future is created in the
+  root zone and never completes there. Use `unawaited(sub.cancel())`.
+- **Poll/restart races** (earlier bug, now structural): wizard notifiers guard
+  late async results with a `_gen` counter checked after every `await`;
+  `RealBleManager.request` fails a superseded request for the same opcode and
+  only removes its own completer. Keep both.
 
 ## Planning
 
@@ -82,10 +97,10 @@ Config: YOLO mode, standard granularity, parallel execution, research + plan-che
 - The concrete manager is chosen once, in `main.dart`, via
   `ProviderScope`/`ProviderContainer` override — `RealBleManager()` for
   hardware, `MockBleManager()` to run/test without a device.
-- Protocol framing + decoders live in `lib/ble/api_v2.dart` (pure Dart, no BLE
-  import, unit-tested in `test/ble/api_v2_test.dart`). `RealBleManager` owns
-  packet reassembly and the topic-group merge; providers just forward
-  `DeviceState?`.
+- Protocol framing + decoders live in `lib/ble/api_v3.dart` (pure Dart, no BLE
+  import, unit-tested in `test/ble/api_v3_test.dart`). `RealBleManager` owns
+  packet reassembly; `LiveFeed` merges the topic subscriptions into
+  `DeviceState?` for the providers.
 - `BleManager.deviceStream` emits `DeviceState?` — `null` is the stale-data
   sentinel on disconnect/error. Never render last-known values as live.
 - Riverpod 3.x — use `Notifier`/`AsyncNotifier`, not `StateNotifierProvider`

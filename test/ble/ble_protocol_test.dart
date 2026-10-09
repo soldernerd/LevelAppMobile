@@ -14,9 +14,5 @@ void main() {
     test('device name prefix matches the firmware BLE_DEVICE_NAME', () {
       expect(kDeviceNamePrefix, equals('Leveltronic'));
     });
-
-    test('subscription interval respects the 50 ms firmware floor', () {
-      expect(kSubscriptionInterval.inMilliseconds, greaterThanOrEqualTo(50));
-    });
   });
 }

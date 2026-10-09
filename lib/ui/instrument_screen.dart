@@ -2,21 +2,21 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:inclinometer/ble/api_v2.dart';
+
 import 'package:inclinometer/models/device_state.dart';
 import 'package:inclinometer/providers/device_provider.dart';
+import 'package:inclinometer/providers/tare_provider.dart';
+import 'package:inclinometer/ui/precision_sheet.dart';
+import 'package:inclinometer/ui/widgets/battery_indicator.dart';
+import 'package:inclinometer/ui/widgets/format.dart';
+import 'package:inclinometer/ui/widgets/vibration_indicator.dart';
 
-/// Instrument screen shown after a successful BLE connection.
+/// The live screen: S1, S2 and Diff in large type with a vibration indicator
+/// each, the battery and on-board temperature small in the top bar, a button
+/// to zero the difference and one to take a precision measurement.
 ///
-/// Shows the live displacement readings (S1/S2, mm — the instrument's core
-/// "live readings" value), plus battery voltage/state and on-board/external/
-/// ambient temperature, humidity and pressure. Values grey out and a
-/// DISCONNECTED badge appears when the data goes stale. "Zero Calibration"
-/// and "Measure" open the two triggered-action flows.
-///
-/// Architecture: no `flutter_blue_plus` import here. All BLE actions go
-/// through [connectionNotifierProvider.notifier] or [bleManagerProvider]
-/// (via the measurement notifiers) — never directly from this widget.
+/// Architecture: no `flutter_blue_plus` import here; everything goes through
+/// the providers.
 class InstrumentScreen extends ConsumerWidget {
   const InstrumentScreen({super.key});
 
@@ -24,6 +24,7 @@ class InstrumentScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final status = ref.watch(connectionNotifierProvider);
     final dataAsync = ref.watch(instrumentDataProvider);
+    final tare = ref.watch(tareProvider);
 
     ref.listen(connectionNotifierProvider, (prev, next) {
       if (next == ConnectionStatus.disconnected ||
@@ -36,11 +37,11 @@ class InstrumentScreen extends ConsumerWidget {
     // [not yet connected]. Do not collapse the two.
     final isStale = dataAsync.hasValue && dataAsync.value == null;
     final DeviceState? d = dataAsync.hasValue ? dataAsync.value : null;
+    final connected = status == ConnectionStatus.connected;
+    final hasReading = d?.hasReading ?? false;
 
-    final isActiveConnection = status == ConnectionStatus.connected ||
-        status == ConnectionStatus.connecting ||
-        status == ConnectionStatus.reconnecting;
-    final isConnected = status == ConnectionStatus.connected;
+    final diff = d?.tiltDiff;
+    final shownDiff = diff == null ? null : diff - (tare ?? 0);
 
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
@@ -48,374 +49,293 @@ class InstrumentScreen extends ConsumerWidget {
         backgroundColor: const Color(0xFF1E1E1E),
         title: const Text('Leveltronic', style: TextStyle(fontSize: 18)),
         actions: [
-          if (d != null) ...[
-            Icon(_batteryIcon(d.batteryPercent, d.charging),
-                color: Colors.white, size: 20),
-            const SizedBox(width: 4),
-            Text('${d.batteryPercent}%',
-                style: const TextStyle(fontSize: 13, color: Colors.white)),
-            const SizedBox(width: 8),
+          if (d?.onboardTempC != null) ...[
+            const Icon(Icons.thermostat, size: 18, color: Colors.white54),
+            Text(
+              fmtSigned(d!.onboardTempC, decimals: 1, unit: '°C'),
+              key: const ValueKey('onboard-temp'),
+              style: const TextStyle(fontSize: 13, color: Colors.white70),
+            ),
+            const SizedBox(width: 12),
           ],
-          Chip(
-            backgroundColor: _chipColor(status),
-            label: Text(_chipLabel(status),
-                style: const TextStyle(fontSize: 13, color: Colors.white)),
-            visualDensity: VisualDensity.compact,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-          ),
-          const SizedBox(width: 8),
+          if (d?.status != null) ...[
+            BatteryIndicator(
+              key: const ValueKey('battery'),
+              percent: d!.batteryPercent,
+              charging: d.charging,
+              state: d.batteryState,
+              size: 18,
+            ),
+            const SizedBox(width: 4),
+          ],
           if (kDebugMode)
-            TextButton(
+            IconButton(
+              tooltip: 'Simulate disconnect',
+              icon: const Icon(Icons.link_off, size: 20),
               onPressed: () => ref
                   .read(connectionNotifierProvider.notifier)
                   .debugSimulateDisconnect(),
-              child: const Text('Sim. Disconnect',
-                  style: TextStyle(fontSize: 13, color: Colors.white70)),
             ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: AnimatedOpacity(
-                opacity: isStale ? 0.40 : 1.0,
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOut,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _LiveReadings(state: d),
-                    if (isStale)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 12, bottom: 4),
-                        child: Center(
-                          child: Text(
-                            'DISCONNECTED',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFFD32F2F),
-                              letterSpacing: 1.5,
-                            ),
-                          ),
-                        ),
-                      ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: isConnected
-                                ? () => context.push('/instrument/zero')
-                                : null,
-                            icon: const Icon(Icons.restart_alt),
-                            label: const Text('Zero Calibration'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton.icon(
-                            onPressed: isConnected
-                                ? () => context.push('/instrument/precision')
-                                : null,
-                            icon: const Icon(Icons.center_focus_strong),
-                            label: const Text('Measure'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _SectionLabel('Battery'),
-                    _ReadoutTile(
-                      label: 'Voltage',
-                      value: _fmtVolts(d?.batteryMillivolts),
-                    ),
-                    _ReadoutTile(
-                      label: 'Charge',
-                      value: d == null ? '—' : '${d.batteryPercent} %',
-                    ),
-                    _ReadoutTile(
-                      label: 'State',
-                      value: d == null ? '—' : _batteryStateLabel(d),
-                    ),
-                    const SizedBox(height: 16),
-                    _SectionLabel('Temperature'),
-                    _ReadoutTile(
-                      label: 'On-board',
-                      value: _fmtTemp(d?.onboardTempC),
-                    ),
-                    _ReadoutTile(
-                      label: 'External probe',
-                      value: _fmtTemp(d?.externalTempC),
-                    ),
-                    _ReadoutTile(
-                      label: 'Ambient (BME280)',
-                      value: _fmtTemp(d?.bme280TempC),
-                      stale: d != null && !d.bme280Fresh,
-                    ),
-                    const SizedBox(height: 16),
-                    _SectionLabel('Environment'),
-                    _ReadoutTile(
-                      label: 'Humidity',
-                      value: d?.humidityPct == null
-                          ? '—'
-                          : '${d!.humidityPct!.toStringAsFixed(1)} %RH',
-                      stale: d != null && !d.bme280Fresh,
-                    ),
-                    _ReadoutTile(
-                      label: 'Pressure',
-                      value: d?.pressureHpa == null
-                          ? '—'
-                          : '${d!.pressureHpa!.toStringAsFixed(1)} hPa',
-                      stale: d != null && !d.bme280Fresh,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          if (isActiveConnection)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: OutlinedButton(
-                onPressed: () =>
-                    ref.read(connectionNotifierProvider.notifier).disconnect(),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: Colors.red[400]!),
-                  foregroundColor: Colors.red[400],
-                ),
-                child: const Text('Disconnect'),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Live displacement readout — the instrument's core "live readings" value.
-/// Two sensors (S1/S2), mm, updated continuously while [DeviceState.displacementOk]
-/// is true; greyed placeholders otherwise (demod not running yet).
-class _LiveReadings extends StatelessWidget {
-  const _LiveReadings({required this.state});
-
-  final DeviceState? state;
-
-  @override
-  Widget build(BuildContext context) {
-    final ok = state?.displacementOk ?? false;
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1A1A),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
-      ),
-      child: Column(
-        children: [
-          _DisplacementRow(
-            label: 'S1',
-            valueMm: state?.displacementS1Mm,
-            ok: ok,
-            qualityOk: state?.quality1Ok ?? true,
-          ),
-          const SizedBox(height: 4),
-          _DisplacementRow(
-            label: 'S2',
-            valueMm: state?.displacementS2Mm,
-            ok: ok,
-            qualityOk: state?.quality2Ok ?? true,
-          ),
-          if (!ok) ...[
-            const SizedBox(height: 8),
-            const Text(
-              'Live readings not available — sensor not running',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Colors.white30),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _DisplacementRow extends StatelessWidget {
-  const _DisplacementRow({
-    required this.label,
-    required this.valueMm,
-    required this.ok,
-    required this.qualityOk,
-  });
-
-  final String label;
-  final double? valueMm;
-  final bool ok;
-  final bool qualityOk;
-
-  @override
-  Widget build(BuildContext context) {
-    final show = ok && valueMm != null;
-    final color = !show
-        ? Colors.white38
-        : (qualityOk ? Colors.white : const Color(0xFFFFA000));
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label,
-            style: const TextStyle(fontSize: 28, color: Colors.white38)),
-        Row(
-          children: [
-            if (show && !qualityOk)
-              const Padding(
-                padding: EdgeInsets.only(right: 6),
-                child: Icon(Icons.warning_amber_rounded,
-                    size: 18, color: Color(0xFFFFA000)),
-              ),
-            Text(
-              show ? '${_fmtDisplacement(valueMm!)} mm' : '––.––– mm',
-              style: TextStyle(
-                fontSize: 40,
-                fontWeight: FontWeight.w700,
-                color: color,
-                fontFeatures: const [FontFeature.tabularFigures()],
-                height: 1.0,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4, top: 4),
-      child: Text(
-        text.toUpperCase(),
-        style: const TextStyle(
-          fontSize: 12,
-          color: Colors.white38,
-          letterSpacing: 1.2,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-class _ReadoutTile extends StatelessWidget {
-  const _ReadoutTile({
-    required this.label,
-    required this.value,
-    this.stale = false,
-  });
-
-  final String label;
-  final String value;
-  final bool stale;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.baseline,
-        textBaseline: TextBaseline.alphabetic,
-        children: [
-          Text(label,
-              style: const TextStyle(fontSize: 15, color: Colors.white60)),
-          Row(
-            children: [
-              if (stale)
-                const Padding(
-                  padding: EdgeInsets.only(right: 6),
-                  child: Icon(Icons.history_toggle_off,
-                      size: 14, color: Colors.white30),
-                ),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-              ),
+          PopupMenuButton<String>(
+            key: const ValueKey('menu'),
+            onSelected: (v) => _onMenu(context, ref, v),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'calibration', child: Text('Calibration')),
+              PopupMenuItem(value: 'settings', child: Text('Settings')),
+              PopupMenuItem(value: 'info', child: Text('All values')),
+              PopupMenuItem(value: 'diagnostics', child: Text('Diagnostics')),
+              PopupMenuDivider(),
+              PopupMenuItem(value: 'disconnect', child: Text('Disconnect')),
             ],
           ),
         ],
       ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+          child: Column(
+            children: [
+              if (isStale)
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'DISCONNECTED',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFFD32F2F),
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                ),
+              Expanded(
+                child: AnimatedOpacity(
+                  opacity: isStale ? 0.40 : 1.0,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOut,
+                  child: Column(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: _ReadingCard(
+                          label: 'S1',
+                          value: d?.tiltS1,
+                          hasReading: hasReading,
+                          disturbed: d?.s1Doubtful ?? false,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        flex: 2,
+                        child: _ReadingCard(
+                          label: 'S2',
+                          value: d?.tiltS2,
+                          hasReading: hasReading,
+                          disturbed: d?.s2Doubtful ?? false,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        flex: 3,
+                        child: _ReadingCard(
+                          label: 'DIFF',
+                          sublabel: 'S1 − S2',
+                          value: shownDiff,
+                          hasReading: hasReading,
+                          disturbed: d?.diffDoubtful ?? false,
+                          emphasis: true,
+                          zeroed: tare != null,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (d != null && !d.demodRunning)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text(
+                    'The tilt measurement is stopped.',
+                    style: TextStyle(color: Color(0xFFFFA000)),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      key: const ValueKey('zero-diff'),
+                      onPressed: connected && hasReading && diff != null
+                          ? () => _zeroDiff(context, ref, d!)
+                          : null,
+                      onLongPress: tare != null
+                          ? () => ref.read(tareProvider.notifier).clear()
+                          : null,
+                      icon: Icon(tare == null
+                          ? Icons.exposure_zero
+                          : Icons.restart_alt),
+                      label: Text(tare == null ? 'Zero Diff' : 'Re-zero Diff'),
+                      style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(52)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      key: const ValueKey('precision'),
+                      onPressed:
+                          connected ? () => showPrecisionSheet(context) : null,
+                      icon: const Icon(Icons.center_focus_strong),
+                      label: const Text('Precision'),
+                      style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(52)),
+                    ),
+                  ),
+                ],
+              ),
+              if (tare != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    'Diff is zeroed at ${fmtTilt(tare)} mm/m (long-press the '
+                    'button to clear)',
+                    style: const TextStyle(fontSize: 12, color: Colors.white54),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
+  }
+
+  Future<void> _zeroDiff(
+      BuildContext context, WidgetRef ref, DeviceState d) async {
+    final notifier = ref.read(tareProvider.notifier);
+    if (d.diffDoubtful) {
+      final go = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Reading is disturbed'),
+          content: const Text(
+              'The table is not quiet. Zeroing now would bake the disturbance '
+              'in. Zero anyway?'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Zero anyway')),
+          ],
+        ),
+      );
+      if (go != true) return;
+    }
+    await notifier.set(d.tiltDiff!);
+  }
+
+  void _onMenu(BuildContext context, WidgetRef ref, String value) {
+    switch (value) {
+      case 'calibration':
+        context.push('/instrument/calibration');
+      case 'settings':
+        context.push('/instrument/settings');
+      case 'info':
+        context.push('/instrument/info');
+      case 'diagnostics':
+        context.push('/instrument/diagnostics');
+      case 'disconnect':
+        ref.read(connectionNotifierProvider.notifier).disconnect();
+    }
   }
 }
 
-// ---------------------------------------------------------------------------
-// Formatting helpers
-// ---------------------------------------------------------------------------
+class _ReadingCard extends StatelessWidget {
+  const _ReadingCard({
+    required this.label,
+    required this.value,
+    required this.hasReading,
+    required this.disturbed,
+    this.sublabel,
+    this.emphasis = false,
+    this.zeroed = false,
+  });
 
-String _fmtDisplacement(double v) =>
-    '${v >= 0 ? '+' : '−'}${v.abs().toStringAsFixed(3)}';
+  final String label;
+  final String? sublabel;
+  final double? value;
+  final bool hasReading;
+  final bool disturbed;
+  final bool emphasis;
+  final bool zeroed;
 
-String _fmtTemp(double? c) =>
-    c == null ? '—' : '${c >= 0 ? '+' : '−'}${c.abs().toStringAsFixed(2)} °C';
-
-String _fmtVolts(int? mv) =>
-    mv == null || mv == 0 ? '—' : '${(mv / 1000).toStringAsFixed(3)} V';
-
-String _batteryStateLabel(DeviceState d) {
-  final base = switch (d.batteryState) {
-    BatteryState.normal => 'Normal',
-    BatteryState.low => 'Low',
-    BatteryState.critical => 'Critical',
-    BatteryState.charging => 'Charging',
-    BatteryState.full => 'Full',
-    BatteryState.unknown => 'Unknown',
-  };
-  if (d.charging && d.batteryState != BatteryState.charging) return '$base · chg';
-  return base;
-}
-
-IconData _batteryIcon(int battery, bool charging) {
-  if (charging) return Icons.battery_charging_full;
-  if (battery > 75) return Icons.battery_full;
-  if (battery > 40) return Icons.battery_6_bar;
-  if (battery > 15) return Icons.battery_3_bar;
-  return Icons.battery_0_bar;
-}
-
-Color _chipColor(ConnectionStatus status) {
-  return switch (status) {
-    ConnectionStatus.idle => const Color(0xFF757575),
-    ConnectionStatus.scanning => const Color(0xFF1E88E5),
-    ConnectionStatus.connecting => const Color(0xFFFFA000),
-    ConnectionStatus.connected => const Color(0xFF43A047),
-    ConnectionStatus.reconnecting => const Color(0xFFF57F17),
-    ConnectionStatus.disconnecting => const Color(0xFFD32F2F),
-    ConnectionStatus.disconnected => const Color(0xFFD32F2F),
-    ConnectionStatus.error => const Color(0xFFD32F2F),
-  };
-}
-
-String _chipLabel(ConnectionStatus status) {
-  return switch (status) {
-    ConnectionStatus.idle => 'Idle',
-    ConnectionStatus.scanning => 'Scanning',
-    ConnectionStatus.connecting => 'Connecting…',
-    ConnectionStatus.connected => 'Connected',
-    ConnectionStatus.reconnecting => 'Reconnecting…',
-    ConnectionStatus.disconnecting => 'Disconnecting…',
-    ConnectionStatus.disconnected => 'Disconnected',
-    ConnectionStatus.error => 'Error',
-  };
+  @override
+  Widget build(BuildContext context) {
+    final show = hasReading && value != null;
+    final color = !show
+        ? Colors.white38
+        : (disturbed ? const Color(0xFFFFA000) : Colors.white);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: emphasis ? const Color(0xFF1B2A38) : const Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+            color: emphasis ? const Color(0xFF3D6A94) : Colors.white12),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 64,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: TextStyle(
+                        fontSize: emphasis ? 24 : 22,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white54)),
+                if (sublabel != null)
+                  Text(zeroed ? 'zeroed' : sublabel!,
+                      style: const TextStyle(
+                          fontSize: 11, color: Colors.white38)),
+              ],
+            ),
+          ),
+          Expanded(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    show ? fmtTilt(value) : '––.––––',
+                    key: ValueKey('reading-$label'),
+                    style: TextStyle(
+                      fontSize: emphasis ? 76 : 62,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      height: 1.0,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text('mm/m',
+                      style: TextStyle(
+                          fontSize: emphasis ? 22 : 18,
+                          color: Colors.white54)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          VibrationIndicator(disturbed: disturbed, hasReading: hasReading),
+        ],
+      ),
+    );
+  }
 }

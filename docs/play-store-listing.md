@@ -23,23 +23,27 @@ Live readings from your Leveltronic precision level over Bluetooth.
 
 ```
 Leveltronic is the companion app for the Leveltronic precision level
-instrument. Connect over Bluetooth Low Energy to see the instrument's
-measurements live on your phone:
+instrument. Connect over Bluetooth Low Energy and use your phone as a large,
+readable display and remote control:
 
-• Battery voltage, charge level and state
-• On-board, external-probe and ambient (BME280) temperature
-• Relative humidity and barometric pressure
-• USB / charging status
+• Live readings: S1, S2 and the difference (S1 − S2) in mm/m, large and
+  steady, with a vibration indicator that warns when the table is not quiet
+• Zero the difference at the touch of a button
+• Precision measurement: the instrument waits for a quiet moment and reports
+  one reliable value
+• Guided calibration: zero (180° flip), phase and sensitivity (gain), for one
+  sensor or both, with before/after values
+• All settings in one place: auto power-off, charging threshold, battery
+  limits, power off, force charge and more
+• All values: battery voltage and state of charge, temperatures, humidity,
+  pressure, clock
+• Signal diagnostics: RMS, peak-to-peak and phase of all four channels
 
-The app scans for nearby Leveltronic instruments, connects with one tap,
-and streams readings continuously. When the link drops, the last values
-are greyed out and marked stale so you never mistake them for live data.
+The battery level and charging state are always visible. No account, no
+sign-in, no data collection: Bluetooth is used only to talk to your own
+instrument; nothing is recorded or sent anywhere.
 
-No account, no sign-in, no data collection. Bluetooth is used only to talk
-to your own instrument; nothing is recorded or sent anywhere.
-
-Tilt / angle readout is shown as a placeholder in this version — the
-current instrument firmware does not yet expose an angle value.
+Requires instrument firmware 0.11 or newer.
 ```
 
 ## Privacy policy URL

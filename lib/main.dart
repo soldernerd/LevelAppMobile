@@ -2,15 +2,10 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:inclinometer/ble/real_ble_manager.dart';
-import 'package:inclinometer/models/device_state.dart';
 import 'package:inclinometer/providers/device_provider.dart';
-import 'package:inclinometer/ui/instrument_screen.dart';
-import 'package:inclinometer/ui/precision_measurement_screen.dart';
-import 'package:inclinometer/ui/scan_screen.dart';
-import 'package:inclinometer/ui/zero_calibration_screen.dart';
+import 'package:inclinometer/router.dart';
 
 // WR-02: Dispose _container when the app process is torn down by the OS.
 // WidgetsBindingObserver is the only reliable hook that fires on detach
@@ -25,7 +20,8 @@ class _AppLifecycleObserver extends WidgetsBindingObserver {
 }
 
 // The single place the concrete BLE implementation is chosen. Swap in
-// MockBleManager() here to drive the UI without hardware.
+// MockBleManager.demo() here to drive the UI with a simulated instrument
+// (service mode can be flipped from the debug-only menu entry in a test).
 // All overrides live on _container — ProviderScope uses parent: _container.
 final _container = ProviderContainer(
   overrides: [
@@ -33,44 +29,9 @@ final _container = ProviderContainer(
   ],
 );
 
-// GoRouter instance — no refreshListenable (D-04).
-// Redirect fires only on navigation attempts, not on live state changes.
-// Post-connect navigation to /instrument is handled explicitly by ScanScreen
-// via context.go('/instrument').
-final _router = GoRouter(
-  initialLocation: '/scan',
-  redirect: (context, state) {
-    // Guard: only redirect to /scan if the user is trying to reach /instrument
-    // (or one of its zero-cal/precision sub-routes) without being connected.
-    // The matchedLocation check prevents redirect loops when already on /scan
-    // (RESEARCH.md Pitfall 1).
-    if (state.matchedLocation.startsWith('/instrument') &&
-        _container.read(connectionNotifierProvider) !=
-            ConnectionStatus.connected) {
-      return '/scan';
-    }
-    return null;
-  },
-  routes: [
-    GoRoute(
-      path: '/scan',
-      builder: (context, state) => const ScanScreen(),
-    ),
-    GoRoute(
-      path: '/instrument',
-      builder: (context, state) => const InstrumentScreen(),
-      routes: [
-        GoRoute(
-          path: 'zero',
-          builder: (context, state) => const ZeroCalibrationScreen(),
-        ),
-        GoRoute(
-          path: 'precision',
-          builder: (context, state) => const PrecisionMeasurementScreen(),
-        ),
-      ],
-    ),
-  ],
+// The router lives in router.dart so tests can build the same one.
+final _router = buildRouter(
+  readStatus: () => _container.read(connectionNotifierProvider),
 );
 
 Future<void> main() async {

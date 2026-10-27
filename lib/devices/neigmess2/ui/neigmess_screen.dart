@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-import 'package:inclinometer/ble/api_v3.dart';
-import 'package:inclinometer/ble/device_link.dart';
 import 'package:inclinometer/devices/neigmess2/neigmess_state.dart';
 import 'package:inclinometer/devices/neigmess2/protocol.dart';
 import 'package:inclinometer/devices/neigmess2/providers/neigmess_provider.dart';
+import 'package:inclinometer/devices/neigmess2/ui/actions.dart';
 import 'package:inclinometer/providers/device_provider.dart';
 import 'package:inclinometer/ui/device_switcher.dart';
 
@@ -35,11 +35,14 @@ class NeigMessScreen extends ConsumerWidget {
               enabled: connected,
               onSelected: (v) => _onMenu(context, ref, v),
               itemBuilder: (_) => const [
+                PopupMenuItem(value: 'flip', child: Text('Flip zero…')),
+                PopupMenuItem(
+                  value: 'calibration',
+                  child: Text('Calibration…'),
+                ),
+                PopupMenuDivider(),
                 PopupMenuItem(value: 'zero', child: Text('Zero sensors')),
                 PopupMenuItem(value: 'clear', child: Text('Clear zero')),
-                PopupMenuItem(
-                    value: 'neutral', child: Text('Capture neutral')),
-                PopupMenuItem(value: 'store', child: Text('Store calibration')),
                 PopupMenuDivider(),
                 PopupMenuItem(value: 'disconnect', child: Text('Disconnect')),
               ],
@@ -77,67 +80,31 @@ class NeigMessScreen extends ConsumerWidget {
     final session = ref.read(neigmessSessionProvider);
     if (session == null) return;
     switch (v) {
+      case 'flip':
+        context.push('/neigmess2/zero');
+      case 'calibration':
+        context.push('/neigmess2/calibration');
       case 'zero':
-        if (await _confirm(
-            context,
-            'Zero the sensors?',
-            'Open the air gap wide first. The present readings become the '
-                'zero position and are stored in the EEPROM.')) {
-          await _run(messenger, session.zeroSensors);
+        if (await confirmAction(
+          context,
+          'Zero the sensors?',
+          'Open the air gap wide first. The present readings become the '
+              'zero position and are stored in the EEPROM.',
+        )) {
+          await runAction(messenger, session.zeroSensors);
         }
       case 'clear':
-        if (await _confirm(context, 'Clear the zero?',
-            'All offsets go back to 0 and are stored in the EEPROM.')) {
-          await _run(messenger, session.clearZero);
-        }
-      case 'neutral':
-        await _run(messenger, session.api.captureNeutral);
-      case 'store':
-        if (await _confirm(context, 'Store the calibration?',
-            'Writes the calibration to the EEPROM.')) {
-          await _run(messenger, session.api.storeCalibration);
+        if (await confirmAction(
+          context,
+          'Clear the zero?',
+          'All offsets go back to 0 and are stored in the EEPROM.',
+        )) {
+          await runAction(messenger, session.clearZero);
         }
       case 'disconnect':
         await ref.read(connectionNotifierProvider.notifier).disconnect();
     }
   }
-
-  Future<bool> _confirm(BuildContext context, String title, String text) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: Text(text),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('OK')),
-        ],
-      ),
-    );
-    return ok == true;
-  }
-
-  Future<void> _run(
-    ScaffoldMessengerState messenger,
-    Future<void> Function() f,
-  ) async {
-    try {
-      await f();
-    } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(_describe(e))));
-    }
-  }
-
-  String _describe(Object e) => switch (e) {
-        ApiException(status: ApiStatus.invalidParameter) =>
-          'The device refused: the alignment must be OK first.',
-        ApiException() => e.message,
-        _ => 'The command failed ($e).',
-      };
 }
 
 class _TiltCard extends StatelessWidget {
@@ -180,9 +147,11 @@ class _TiltCard extends StatelessWidget {
             if (note != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Text(note,
-                    key: const ValueKey('tilt-note'),
-                    style: const TextStyle(color: Color(0xFFFFA000))),
+                child: Text(
+                  note,
+                  key: const ValueKey('tilt-note'),
+                  style: const TextStyle(color: Color(0xFFFFA000)),
+                ),
               ),
           ],
         ),
@@ -205,7 +174,10 @@ class _Table extends StatelessWidget {
     final rows = <(String, String)>[
       ('Plate capacitance', _f(s?.plateCapPf, 2, 'pF')),
       for (var i = 0; i < 4; i++)
-        (i == 3 ? 'Sensor 3 (centre)' : 'Sensor $i', _f(s?.sensorPf(i), 3, 'pF')),
+        (
+          i == 3 ? 'Sensor 3 (centre)' : 'Sensor $i',
+          _f(s?.sensorPf(i), 3, 'pF'),
+        ),
       ('Angle X', _f(s?.angleXDeg, 2, '°')),
       ('Angle Y', _f(s?.angleYDeg, 2, '°')),
     ];

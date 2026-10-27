@@ -43,6 +43,23 @@ class SimulatedNeigMess implements SimulatedPeripheral {
   /// How often the EEPROM was written (zero / clear / store / calibration SET).
   int eepromWrites = 0;
 
+  // The EEPROM copy of the calibration; RAM above, stored by _commit().
+  List<double> _eZero = [0, 0, 0, 0];
+  int _eMul = 1000, _eOfs = 0;
+  double _eNeutral = 16.38;
+
+  // The flip-test zero routine.
+  NmZeroState _zState = NmZeroState.idle;
+  int _zProgress = 0;
+  bool _zPos1Valid = false, _zPos2Valid = false;
+  double _zPos1 = 0, _zPos2 = 0;
+  Timer? _zTimer;
+
+  /// The flip-test zero: the instrument really reads [flipTilt] in position 1
+  /// and -[flipTilt] in position 2, plus its own zero error [flipBias] (µm/m).
+  /// The routine should find an offset of -[flipBias].
+  double flipTilt = 100.0, flipBias = 3.0;
+
   final Map<int, Timer> _timers = {};
   final Map<int, StreamController<Uint8List>> _subs = {};
 
@@ -64,14 +81,16 @@ class SimulatedNeigMess implements SimulatedPeripheral {
           return res == SysRes.identity
               ? ApiReply(ApiStatus.ok, _identity())
               : res == 0x01
-                  ? ApiReply(ApiStatus.ok, Uint8List(4))
-                  : const ApiReply(ApiStatus.unknownResource);
+              ? ApiReply(ApiStatus.ok, Uint8List(4))
+              : const ApiReply(ApiStatus.unknownResource);
         }
         final data = _read(cat, res);
         if (data == null) {
-          return ApiReply(_knownCategory(cat)
-              ? ApiStatus.unknownResource
-              : ApiStatus.unknownCategory);
+          return ApiReply(
+            _knownCategory(cat)
+                ? ApiStatus.unknownResource
+                : ApiStatus.unknownCategory,
+          );
         }
         return ApiReply(ApiStatus.ok, data);
       case ApiVerb.set:
@@ -99,20 +118,24 @@ class SimulatedNeigMess implements SimulatedPeripheral {
     final res = opcodeResource(subscribeOpcode);
     if (_read(cat, res) == null) {
       return Stream<Uint8List>.error(
-          ApiException(ApiStatus.unknownResource, 'subscribe'));
+        ApiException(ApiStatus.unknownResource, 'subscribe'),
+      );
     }
     if (intervalMs < 50) {
       return Stream<Uint8List>.error(
-          ApiException(ApiStatus.invalidParameter, 'subscribe'));
+        ApiException(ApiStatus.invalidParameter, 'subscribe'),
+      );
     }
     late final StreamController<Uint8List> c;
     c = StreamController<Uint8List>.broadcast(
       onListen: () {
-        _timers[subscribeOpcode] =
-            Timer.periodic(Duration(milliseconds: intervalMs), (_) {
-          final data = _read(cat, res);
-          if (data != null && !c.isClosed) c.add(data);
-        });
+        _timers[subscribeOpcode] = Timer.periodic(
+          Duration(milliseconds: intervalMs),
+          (_) {
+            final data = _read(cat, res);
+            if (data != null && !c.isClosed) c.add(data);
+          },
+        );
       },
       onCancel: () {
         _timers.remove(subscribeOpcode)?.cancel();
@@ -138,6 +161,7 @@ class SimulatedNeigMess implements SimulatedPeripheral {
       t.cancel();
     }
     _timers.clear();
+    _zTimer?.cancel();
     for (final c in _subs.values.toList()) {
       if (!c.isClosed) c.close();
     }
@@ -179,10 +203,10 @@ class SimulatedNeigMess implements SimulatedPeripheral {
         NmMeas.angleX => i16(angleXCdeg),
         NmMeas.angleY => i16(angleYCdeg),
         NmMeas.angleZ => i16(angleZCdeg),
-        NmMeas.tilt =>
-          encodeFloat(tiltStatus == NmTiltStatus.ok ? tilt : 0),
+        NmMeas.tilt => encodeFloat(tiltStatus == NmTiltStatus.ok ? tilt : 0),
         NmMeas.plateCap => encodeFloat(plateCapPf),
         NmMeas.tiltStatus => Uint8List.fromList([tiltStatus.value]),
+        NmMeas.zeroRoutine => _routine().encode(),
         _ => null,
       };
     }
@@ -190,9 +214,9 @@ class SimulatedNeigMess implements SimulatedPeripheral {
       return switch (res) {
         NmCal.zeroOffsets => NmZeroOffsets(zeroOffsets).encode(),
         NmCal.tiltTrim => NmTiltTrim(
-                multiplierX1000: trimMultiplierX1000,
-                offsetTenthUmPerM: trimOffsetTenth)
-            .encode(),
+          multiplierX1000: trimMultiplierX1000,
+          offsetTenthUmPerM: trimOffsetTenth,
+        ).encode(),
         NmCal.angleOffsets => Uint8List(4),
         NmCal.neutralCap => encodeFloat(neutralCapPf),
         _ => null,
@@ -231,20 +255,95 @@ class SimulatedNeigMess implements SimulatedPeripheral {
       default:
         return const ApiReply(ApiStatus.unknownResource);
     }
-    eepromWrites++;
+    _commit();
     return const ApiReply(ApiStatus.ok);
+  }
+
+  /// Writes the RAM calibration to the (simulated) EEPROM.
+  void _commit() {
+    _eZero = List.of(zeroOffsets);
+    _eMul = trimMultiplierX1000;
+    _eOfs = trimOffsetTenth;
+    _eNeutral = neutralCapPf;
+    eepromWrites++;
+  }
+
+  NmZeroRoutine _routine() => NmZeroRoutine(
+    state: _zState,
+    progress: _zProgress,
+    pos1Valid: _zPos1Valid,
+    pos2Valid: _zPos2Valid,
+    pos1: _zPos1,
+    pos2: _zPos2,
+    offsetTenth: trimOffsetTenth,
+  );
+
+  /// KEY3: start, start measuring, or dismiss; ignored while measuring.
+  void _zeroNext() {
+    switch (_zState) {
+      case NmZeroState.idle:
+        _zPos1Valid = _zPos2Valid = false;
+        _zProgress = 0;
+        _zState = NmZeroState.readyPos1;
+      case NmZeroState.readyPos1:
+        _measure(NmZeroState.measuring1);
+      case NmZeroState.readyPos2:
+        _measure(NmZeroState.measuring2);
+      case NmZeroState.done || NmZeroState.failed:
+        _zState = NmZeroState.idle;
+      case NmZeroState.measuring1 || NmZeroState.measuring2:
+        break;
+    }
+  }
+
+  /// A measurement takes about 5 s.
+  void _measure(NmZeroState measuring) {
+    _zState = measuring;
+    _zProgress = 0;
+    _zTimer?.cancel();
+    _zTimer = Timer.periodic(const Duration(milliseconds: 100), (t) {
+      _zProgress += 2;
+      if (_zProgress < 100) return;
+      t.cancel();
+      if (measuring == NmZeroState.measuring1) {
+        _zPos1 = flipTilt + flipBias;
+        _zPos1Valid = true;
+        _zState = NmZeroState.readyPos2;
+      } else {
+        _zPos2 = -flipTilt + flipBias;
+        _zPos2Valid = true;
+        final ofs = (-(_zPos1 + _zPos2) / 2 * 10).round();
+        if (ofs.abs() > 1000) {
+          _zState = NmZeroState.failed;
+        } else {
+          trimOffsetTenth = ofs;
+          _commit();
+          _zState = NmZeroState.done;
+        }
+      }
+    });
   }
 
   ApiReply _command(int res) {
     switch (res) {
       case NmCmd.zero:
         zeroOffsets = List.of(sensorUnits);
-        eepromWrites++;
+        _commit();
       case NmCmd.clearZero:
         zeroOffsets = [0, 0, 0, 0];
-        eepromWrites++;
+        _commit();
       case NmCmd.store:
-        eepromWrites++;
+        _commit();
+      case NmCmd.recall:
+        zeroOffsets = List.of(_eZero);
+        trimMultiplierX1000 = _eMul;
+        trimOffsetTenth = _eOfs;
+        neutralCapPf = _eNeutral;
+      case NmCmd.zeroNext:
+        _zeroNext();
+      case NmCmd.zeroQuit:
+        _zTimer?.cancel();
+        _zState = NmZeroState.idle;
       case NmCmd.captureNeutral:
         if (tiltStatus != NmTiltStatus.ok) {
           return const ApiReply(ApiStatus.invalidParameter);

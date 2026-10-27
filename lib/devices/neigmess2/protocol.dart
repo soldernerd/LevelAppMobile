@@ -24,6 +24,7 @@ class NmMeas {
   static const int tilt = 0x07;
   static const int plateCap = 0x08;
   static const int tiltStatus = 0x09;
+  static const int zeroRoutine = 0x0A; // flip-test zero progress
 }
 
 /// Commands (category 0x1) resource ids. Zero, clear and store write the EEPROM.
@@ -32,6 +33,9 @@ class NmCmd {
   static const int clearZero = 0x01;
   static const int store = 0x02;
   static const int captureNeutral = 0x03;
+  static const int recall = 0x04; // reload the EEPROM calibration into RAM
+  static const int zeroNext = 0x05; // KEY3 of the flip-test zero
+  static const int zeroQuit = 0x06; // KEY2: abandon the flip-test zero
 }
 
 /// Calibrations (category 0x2) resource ids.
@@ -96,8 +100,9 @@ class NmZeroOffsets {
   static NmZeroOffsets? decode(Uint8List d) {
     if (d.length < 16) return null;
     final bd = ByteData.sublistView(d);
-    return NmZeroOffsets(
-        [for (var i = 0; i < 4; i++) bd.getFloat32(i * 4, Endian.little)]);
+    return NmZeroOffsets([
+      for (var i = 0; i < 4; i++) bd.getFloat32(i * 4, Endian.little),
+    ]);
   }
 
   Uint8List encode() {
@@ -153,8 +158,10 @@ enum NmTiltStatus {
   const NmTiltStatus(this.value);
   final int value;
 
-  static NmTiltStatus fromByte(int b) => NmTiltStatus.values
-      .firstWhere((s) => s.value == b, orElse: () => NmTiltStatus.invalid);
+  static NmTiltStatus fromByte(int b) => NmTiltStatus.values.firstWhere(
+    (s) => s.value == b,
+    orElse: () => NmTiltStatus.invalid,
+  );
 }
 
 double? decodeFloat(Uint8List d) =>
@@ -164,4 +171,118 @@ Uint8List encodeFloat(double v) {
   final b = Uint8List(4);
   ByteData.sublistView(b).setFloat32(0, v, Endian.little);
   return b;
+}
+
+/// Measurements 0x0A: the state of the flip-test zero routine.
+enum NmZeroState {
+  idle(0),
+  readyPos1(1),
+  measuring1(2),
+
+  /// Rotate the instrument 180°, then start position 2.
+  readyPos2(3),
+  measuring2(4),
+
+  /// The zero has been stored; dismiss the result.
+  done(5),
+
+  /// The resulting offset was out of range; nothing was stored.
+  failed(6);
+
+  const NmZeroState(this.value);
+  final int value;
+
+  static NmZeroState fromByte(int b) => NmZeroState.values.firstWhere(
+    (s) => s.value == b,
+    orElse: () => NmZeroState.idle,
+  );
+
+  bool get isMeasuring => this == measuring1 || this == measuring2;
+
+  /// The routine is under way (or showing a result), not idle.
+  bool get isActive => this != idle;
+}
+
+/// Measurements 0x0A (14 bytes). The routine shows on the instrument's LCD too;
+/// its keys and the API commands act on the same state.
+class NmZeroRoutine {
+  const NmZeroRoutine({
+    this.state = NmZeroState.idle,
+    this.progress = 0,
+    this.pos1Valid = false,
+    this.pos2Valid = false,
+    this.unsteady = false,
+    this.pos1 = 0,
+    this.pos2 = 0,
+    this.offsetTenth = 0,
+  });
+
+  final NmZeroState state;
+
+  /// Percent of the current measurement.
+  final int progress;
+  final bool pos1Valid, pos2Valid;
+
+  /// The instrument moved; the measurement starts again.
+  final bool unsteady;
+
+  /// µm/m, model tilt before the fine trim.
+  final double pos1, pos2;
+
+  /// The zero offset now in force, 0.1 µm/m (the trim's offset).
+  final int offsetTenth;
+
+  double get offsetUmPerM => offsetTenth / 10;
+
+  static NmZeroRoutine? decode(Uint8List d) {
+    if (d.length < 14) return null;
+    final bd = ByteData.sublistView(d);
+    final flags = d[2];
+    return NmZeroRoutine(
+      state: NmZeroState.fromByte(d[0]),
+      progress: d[1].clamp(0, 100),
+      pos1Valid: flags & 1 != 0,
+      pos2Valid: flags & 2 != 0,
+      unsteady: flags & 4 != 0,
+      pos1: bd.getFloat32(4, Endian.little),
+      pos2: bd.getFloat32(8, Endian.little),
+      offsetTenth: bd.getInt16(12, Endian.little),
+    );
+  }
+
+  Uint8List encode() {
+    final b = Uint8List(14);
+    b[0] = state.value;
+    b[1] = progress;
+    b[2] = (pos1Valid ? 1 : 0) | (pos2Valid ? 2 : 0) | (unsteady ? 4 : 0);
+    ByteData.sublistView(b)
+      ..setFloat32(4, pos1, Endian.little)
+      ..setFloat32(8, pos2, Endian.little)
+      ..setInt16(12, offsetTenth, Endian.little);
+    return b;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is NmZeroRoutine &&
+      state == other.state &&
+      progress == other.progress &&
+      pos1Valid == other.pos1Valid &&
+      pos2Valid == other.pos2Valid &&
+      unsteady == other.unsteady &&
+      pos1 == other.pos1 &&
+      pos2 == other.pos2 &&
+      offsetTenth == other.offsetTenth;
+
+  @override
+  int get hashCode => Object.hash(
+    state,
+    progress,
+    pos1Valid,
+    pos2Valid,
+    unsteady,
+    pos1,
+    pos2,
+    offsetTenth,
+  );
 }

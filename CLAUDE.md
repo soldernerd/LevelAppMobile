@@ -5,6 +5,7 @@ instrument (STM32G0B1 / RN4871). The scaffold was built mock-first (phases
 1–7); real BLE is now wired against the REV B firmware.
 
 **Package:** `com.soldernerd.inclinometer`
+**Version:** 0.3.x — minor bumped for the multi-device architecture (CI: `major.minor` from `pubspec.yaml`, patch = git commit count)
 **Platform:** Android primary (iOS scaffold included, not tested)
 
 ## Device reality (firmware 0.11+, API v3)
@@ -39,7 +40,7 @@ API v3 only — the Leveltronic driver refuses anything else
   providers read the session from `activeSessionProvider`. **Adding a
   device:** new `lib/devices/<x>/` with a driver + session, add it to the
   registry in `main.dart` — no change to transport, router or scan screen.
-- **NeigMess2** (`lib/devices/neigmess2/`, API in its `docs/device_api.md`) is  the second driver: same framing/UUIDs, but API v2 — IDENTITY is the 19-byte  layout (`ApiIdentity.decode` handles both), no serial (labels fall back to  the BLE address tail), sensor values are *sensor units* not pF (`kUnitToPf`),  writes to the EEPROM on zero/clear/store/SET. It needs BLE writes of ≤ 20  bytes: `RealBleManager._send` chunks to the ATT MTU. Not implemented yet:  bulk transfers (raw stream) and the debug-log subscription (bulk chunks would  need their own push framing: `ApiFrame.looksLikePush` assumes `[seq][page]`).
+- **NeigMess2** (`lib/devices/neigmess2/`, API in its `docs/device_api.md`) is  the second driver: same framing/UUIDs, but API v2 — IDENTITY is the 19-byte  layout (`ApiIdentity.decode` handles both), no serial (labels fall back to  the BLE address tail), sensor values are *sensor units* not pF (`kUnitToPf`),  writes to the EEPROM on zero/clear/store/SET. It needs BLE writes of ≤ 20  bytes: `RealBleManager._send` chunks to the ATT MTU. The app does everything the keys and knobs do, so the instrument can be used without touching it: flip-test zero (`/neigmess2/zero`, follows Measurements 0x0A, Commands 0x05/0x06), calibration screen (`/neigmess2/calibration`: tilt trim, neutral Cn, zero/clear, store/recall). Angle offsets (stored, not applied by the device) are not exposed. Not implemented yet:  bulk transfers (raw stream) and the debug-log subscription (bulk chunks would  need their own push framing: `ApiFrame.looksLikePush` assumes `[seq][page]`).
 - **Subscriptions, not polling.** `DeviceLink.subscribe` shares one device
   subscription between listeners and UNSUBSCRIBEs when the last leaves.
   Always on: Topics LIVE (event, ~4 Hz), STATUS (1 s), ENV (2 s). Per screen:

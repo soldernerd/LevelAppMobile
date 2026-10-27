@@ -5,8 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:inclinometer/ble/mock_ble_manager.dart';
-import 'package:inclinometer/ble/simulated_device.dart';
+import 'package:inclinometer/devices/leveltronic/simulated_device.dart';
 import 'package:inclinometer/providers/device_provider.dart';
+import 'registry.dart';
 
 /// Runs [f] to completion inside a [FakeAsync] zone by advancing the virtual
 /// clock in [step]s; returns its value or rethrows its error. The simulator
@@ -57,7 +58,10 @@ class SimHarness {
   SimHarness({SimulatedDevice? device, MockBleManager? manager})
       : mock = manager ?? MockBleManager(device: device ?? SimulatedDevice()) {
     container = ProviderContainer(
-      overrides: [bleManagerProvider.overrideWithValue(mock)],
+      overrides: [
+        bleManagerProvider.overrideWithValue(mock),
+        deviceRegistryProvider.overrideWithValue(testRegistry),
+      ],
     );
     addTearDown(container.dispose);
     addTearDown(mock.dispose);

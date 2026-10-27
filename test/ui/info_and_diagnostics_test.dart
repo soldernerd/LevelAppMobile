@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:inclinometer/ble/simulated_device.dart';
+import 'package:inclinometer/devices/leveltronic/simulated_device.dart';
 
 import '../support/app_harness.dart';
 
@@ -9,7 +9,7 @@ void main() {
   setUpAll(TestWidgetsFlutterBinding.ensureInitialized);
 
   group('all values', () {
-    const loc = '/instrument/info';
+    const loc = '/leveltronic/info';
 
     testWidgets('shows battery, temperatures, humidity and pressure',
         (tester) async {
@@ -79,7 +79,7 @@ void main() {
   });
 
   group('diagnostics', () {
-    const loc = '/instrument/diagnostics';
+    const loc = '/leveltronic/diagnostics';
 
     testWidgets('shows RMS, peak-to-peak and phase of all four channels',
         (tester) async {

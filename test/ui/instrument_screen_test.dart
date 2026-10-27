@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:inclinometer/ble/api_v3.dart';
-import 'package:inclinometer/ble/simulated_device.dart';
-import 'package:inclinometer/providers/device_provider.dart';
-import 'package:inclinometer/providers/tare_provider.dart';
-import 'package:inclinometer/ui/widgets/battery_indicator.dart';
-import 'package:inclinometer/ui/widgets/vibration_indicator.dart';
+import 'package:inclinometer/devices/leveltronic/protocol.dart';
+import 'package:inclinometer/devices/leveltronic/simulated_device.dart';
+import 'package:inclinometer/devices/leveltronic/providers/leveltronic_provider.dart';
+import 'package:inclinometer/devices/leveltronic/providers/tare_provider.dart';
+import 'package:inclinometer/devices/leveltronic/ui/widgets/battery_indicator.dart';
+import 'package:inclinometer/devices/leveltronic/ui/widgets/vibration_indicator.dart';
 
 import '../support/app_harness.dart';
 

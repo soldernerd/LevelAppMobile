@@ -7,12 +7,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:inclinometer/ble/mock_ble_manager.dart';
-import 'package:inclinometer/models/device_state.dart';
+import 'package:inclinometer/models/connection.dart';
 import 'package:inclinometer/providers/device_provider.dart';
+import '../support/registry.dart';
 import 'package:inclinometer/providers/update_provider.dart';
 import 'package:inclinometer/providers/version_provider.dart';
 import 'package:inclinometer/services/update_service.dart';
-import 'package:inclinometer/ui/instrument_screen.dart';
+import 'package:inclinometer/devices/leveltronic/leveltronic_driver.dart';
+import 'package:inclinometer/devices/leveltronic/ui/instrument_screen.dart';
 import 'package:inclinometer/ui/scan_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -33,10 +35,7 @@ GoRouter _buildRouter() => GoRouter(
           path: '/scan',
           builder: (context, state) => const ScanScreen(),
         ),
-        GoRoute(
-          path: '/instrument',
-          builder: (context, state) => const InstrumentScreen(),
-        ),
+        const LeveltronicDriver().route,
       ],
     );
 
@@ -57,6 +56,7 @@ Widget buildHarness(
   return ProviderScope(
     overrides: [
       bleManagerProvider.overrideWithValue(ble),
+      deviceRegistryProvider.overrideWithValue(testRegistry),
       // Always override updateCheckProvider to prevent network calls in tests.
       updateCheckProvider.overrideWith((ref) async => updateResult),
       // Override versionProvider to avoid platform channel calls in tests.
@@ -122,6 +122,7 @@ void main() {
         ProviderScope(
           overrides: [
             bleManagerProvider.overrideWithValue(ble),
+      deviceRegistryProvider.overrideWithValue(testRegistry),
             updateCheckProvider.overrideWith((ref) async => null),
             versionProvider.overrideWith((ref) async => 'v0.0.0-test'),
             scanResultsProvider.overrideWith(
@@ -159,6 +160,7 @@ void main() {
         ProviderScope(
           overrides: [
             bleManagerProvider.overrideWithValue(ble),
+      deviceRegistryProvider.overrideWithValue(testRegistry),
             updateCheckProvider.overrideWith((ref) async => null),
             versionProvider.overrideWith((ref) async => 'v0.0.0-test'),
             connectionNotifierProvider.overrideWith(
@@ -184,6 +186,7 @@ void main() {
       await tester.pumpWidget(ProviderScope(
         overrides: [
           bleManagerProvider.overrideWithValue(ble),
+      deviceRegistryProvider.overrideWithValue(testRegistry),
           updateCheckProvider.overrideWith((ref) async => null),
           versionProvider.overrideWith((ref) async => 'v0.0.0-test'),
         ],
@@ -234,6 +237,7 @@ void main() {
         ProviderScope(
           overrides: [
             bleManagerProvider.overrideWithValue(ble),
+      deviceRegistryProvider.overrideWithValue(testRegistry),
             updateCheckProvider.overrideWith(
               (ref) async => const UpdateInfo(
                 tagName: 'v9.9.9',
@@ -274,6 +278,7 @@ void main() {
         ProviderScope(
           overrides: [
             bleManagerProvider.overrideWithValue(ble),
+      deviceRegistryProvider.overrideWithValue(testRegistry),
             updateCheckProvider.overrideWith(
               (ref) async => const UpdateInfo(
                 tagName: 'v9.9.9',

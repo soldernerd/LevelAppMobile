@@ -1,30 +1,32 @@
 import 'package:inclinometer/ble/device_link.dart';
-import 'package:inclinometer/models/device_state.dart';
+import 'package:inclinometer/models/connection.dart';
 
-/// Scanning, connecting and the open link to the instrument.
+/// Scanning, and opening links to devices.
 ///
-/// [RealBleManager] talks to the instrument over `flutter_blue_plus`;
-/// [MockBleManager] puts a simulated instrument behind the same interface for
+/// [RealBleManager] talks to devices over `flutter_blue_plus`;
+/// [MockBleManager] puts simulated devices behind the same interface for
 /// tests and for running without hardware. The concrete class is chosen once,
 /// in `main.dart`; nothing else in the app imports `flutter_blue_plus`.
 ///
-/// The protocol itself lives above the [DeviceLink] this interface extends:
-/// `InstrumentApi` (typed operations) and `LiveFeed` (the always-on
-/// subscriptions) work on any link.
-abstract class BleManager implements DeviceLink {
+/// This layer knows nothing about what a device *is*: it finds advertisers and
+/// opens one [DeviceConnection] per device, any number at a time. Identifying
+/// the device and choosing a driver for it is `DeviceRegistry`'s job, on top
+/// of the connection.
+abstract class BleManager {
   /// Emits [ScannedDevice] entries while a scan is active.
   Stream<ScannedDevice> get scanResults;
 
-  /// Current connection state for the instrument.
-  Stream<ConnectionStatus> get connectionStatus;
+  /// Whether a scan is running (false again when it times out or is stopped).
+  Stream<bool> get scanning;
 
-  Future<void> startScan();
+  /// Starts a scan. Only advertisers whose name satisfies [accept] are
+  /// reported (all named ones if null).
+  Future<void> startScan({bool Function(String name)? accept});
   Future<void> stopScan();
 
-  /// Connects and verifies the instrument speaks API v3. Throws
-  /// `IncompatibleFirmwareException` (after dropping the connection) if not.
-  Future<void> connect(String deviceId);
-  Future<void> disconnect();
+  /// Connects to [deviceId] at the transport level (GATT, notifications) and
+  /// returns the open link. Several can be open at once.
+  Future<DeviceConnection> open(String deviceId);
 
   void dispose();
 }

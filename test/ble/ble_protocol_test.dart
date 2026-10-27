@@ -10,9 +10,5 @@ void main() {
       expect(kRxCharUuid, equals('49535343-8841-43f4-a8d4-ecbe34729bb3'));
       expect(kTxCharUuid, equals('49535343-1e4d-4bd9-ba61-23c647249616'));
     });
-
-    test('device name prefix matches the firmware BLE_DEVICE_NAME', () {
-      expect(kDeviceNamePrefix, equals('Leveltronic'));
-    });
   });
 }

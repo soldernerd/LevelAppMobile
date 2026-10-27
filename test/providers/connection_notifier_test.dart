@@ -5,8 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:inclinometer/ble/mock_ble_manager.dart';
-import 'package:inclinometer/models/device_state.dart';
+import 'package:inclinometer/models/connection.dart';
 import 'package:inclinometer/providers/device_provider.dart';
+import '../support/registry.dart';
 
 /// Creates a [ProviderContainer] with the mock BLE manager injected.
 ///
@@ -14,7 +15,10 @@ import 'package:inclinometer/providers/device_provider.dart';
 /// tests don't need to clean up manually.
 ProviderContainer buildContainer(MockBleManager mock) {
   final container = ProviderContainer(
-    overrides: [bleManagerProvider.overrideWithValue(mock)],
+    overrides: [
+      bleManagerProvider.overrideWithValue(mock),
+      deviceRegistryProvider.overrideWithValue(testRegistry),
+    ],
   );
   addTearDown(container.dispose);
   addTearDown(mock.dispose);

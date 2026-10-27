@@ -3,12 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:inclinometer/ble/api_v3.dart';
-import 'package:inclinometer/ble/live_feed.dart';
-import 'package:inclinometer/ble/instrument_api.dart';
+import 'package:inclinometer/devices/leveltronic/live_feed.dart';
+import 'package:inclinometer/devices/leveltronic/instrument_api.dart';
+import 'package:inclinometer/ble/device_link.dart';
 import 'package:inclinometer/ble/mock_ble_manager.dart';
-import 'package:inclinometer/ble/simulated_device.dart';
-import 'package:inclinometer/models/device_state.dart';
+import 'package:inclinometer/devices/leveltronic/simulated_device.dart';
+import 'package:inclinometer/models/connection.dart';
+import 'package:inclinometer/devices/leveltronic/device_state.dart';
 import 'package:inclinometer/providers/device_provider.dart';
+import 'package:inclinometer/devices/leveltronic/providers/leveltronic_provider.dart';
 
 import '../support/harness.dart';
 
@@ -20,8 +23,7 @@ void main() {
       fakeAsync((async) {
         final mock = MockBleManager();
         addTearDown(mock.dispose);
-        settle(async, mock.connect('x'));
-        final feed = LiveFeed(InstrumentApi(mock));
+        final feed = LiveFeed(InstrumentApi(mock.sim));
         final seen = <DeviceState>[];
         feed.stream.listen(seen.add);
         feed.start();
@@ -44,8 +46,7 @@ void main() {
       fakeAsync((async) {
         final mock = MockBleManager();
         addTearDown(mock.dispose);
-        settle(async, mock.connect('x'));
-        final feed = LiveFeed(InstrumentApi(mock))..start();
+        final feed = LiveFeed(InstrumentApi(mock.sim))..start();
         pass(async, const Duration(milliseconds: 60));
         expect(feed.state.status, isNotNull);
         expect(feed.state.live, isNotNull);
@@ -58,8 +59,7 @@ void main() {
       fakeAsync((async) {
         final mock = MockBleManager();
         addTearDown(mock.dispose);
-        settle(async, mock.connect('x'));
-        final api = InstrumentApi(mock);
+        final api = InstrumentApi(mock.sim);
         settle(async, api.setTiltDemod(false));
         expect(settle(async, api.state()).demodRunning, isFalse);
         final feed = LiveFeed(api)..start();
@@ -73,8 +73,7 @@ void main() {
       fakeAsync((async) {
         final mock = MockBleManager();
         addTearDown(mock.dispose);
-        settle(async, mock.connect('x'));
-        final feed = LiveFeed(InstrumentApi(mock))..start();
+        final feed = LiveFeed(InstrumentApi(mock.sim))..start();
         pass(async, const Duration(seconds: 1));
         expect(feed.state.serviceMode, isFalse);
         mock.sim.setServiceMode(true);
@@ -88,8 +87,7 @@ void main() {
       fakeAsync((async) {
         final mock = MockBleManager();
         addTearDown(mock.dispose);
-        settle(async, mock.connect('x'));
-        final feed = LiveFeed(InstrumentApi(mock))..start();
+        final feed = LiveFeed(InstrumentApi(mock.sim))..start();
         pass(async, const Duration(seconds: 1));
         expect(feed.state.diffDoubtful, isFalse);
         mock.sim.disturbed = true;
@@ -159,9 +157,11 @@ void main() {
       fakeAsync((async) {
         final mock = MockBleManager();
         addTearDown(mock.dispose);
+        final conn = settle(async, mock.open('x'));
+        settle(async, conn.close());
         expect(
-          () => settle(async, mock.request(opGet(ApiCat.system, SysRes.state))),
-          throwsA(isA<Object>()),
+          () => settle(async, conn.request(opGet(ApiCat.system, SysRes.state))),
+          throwsA(isA<LinkException>()),
         );
       });
     });

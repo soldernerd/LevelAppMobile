@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:inclinometer/ble/api_catalog.dart';
-import 'package:inclinometer/ble/api_v3.dart';
-import 'package:inclinometer/ble/simulated_device.dart';
-import 'package:inclinometer/providers/device_provider.dart';
+import 'package:inclinometer/devices/leveltronic/api_catalog.dart';
+import 'package:inclinometer/devices/leveltronic/protocol.dart';
+import 'package:inclinometer/devices/leveltronic/simulated_device.dart';
+import 'package:inclinometer/devices/leveltronic/providers/leveltronic_provider.dart';
 
 import '../support/app_harness.dart';
 
@@ -106,7 +106,7 @@ void main() {
   });
 
   group('settings', () {
-    const loc = '/instrument/settings';
+    const loc = '/leveltronic/settings';
 
     testWidgets('lists the settings with their values', (tester) async {
       final h = await AppHarness.start(tester, location: loc);
@@ -213,7 +213,7 @@ void main() {
   });
 
   group('actions', () {
-    const loc = '/instrument/settings';
+    const loc = '/leveltronic/settings';
 
     Future<AppHarness> open(WidgetTester t, {bool service = false}) async {
       final h = await AppHarness.start(t, location: loc);
@@ -253,7 +253,7 @@ void main() {
           find.textContaining('Power the instrument off?'), findsOneWidget);
       await tester.tap(find.text('Cancel'));
       await h.pump(tester, const Duration(milliseconds: 500));
-      expect(h.router.state.matchedLocation, contains('/instrument'));
+      expect(h.router.state.matchedLocation, contains('/leveltronic'));
 
       await tester.tap(find.byKey(const ValueKey('action-power-off')));
       await h.pump(tester, const Duration(milliseconds: 500));

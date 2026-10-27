@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:inclinometer/ble/real_ble_manager.dart';
+import 'package:inclinometer/devices/device_driver.dart';
+import 'package:inclinometer/devices/leveltronic/leveltronic_driver.dart';
+import 'package:inclinometer/devices/neigmess2/neigmess_driver.dart';
 import 'package:inclinometer/providers/device_provider.dart';
 import 'package:inclinometer/router.dart';
 
@@ -19,6 +22,9 @@ class _AppLifecycleObserver extends WidgetsBindingObserver {
   }
 }
 
+// The devices this build supports: one driver per device family.
+final _registry = DeviceRegistry(const [LeveltronicDriver(), NeigMessDriver()]);
+
 // The single place the concrete BLE implementation is chosen. Swap in
 // MockBleManager.demo() here to drive the UI with a simulated instrument
 // (service mode can be flipped from the debug-only menu entry in a test).
@@ -26,12 +32,14 @@ class _AppLifecycleObserver extends WidgetsBindingObserver {
 final _container = ProviderContainer(
   overrides: [
     bleManagerProvider.overrideWithValue(RealBleManager()),
+    deviceRegistryProvider.overrideWithValue(_registry),
   ],
 );
 
 // The router lives in router.dart so tests can build the same one.
 final _router = buildRouter(
-  readStatus: () => _container.read(connectionNotifierProvider),
+  registry: _registry,
+  readActive: () => _container.read(activeSessionProvider),
 );
 
 Future<void> main() async {

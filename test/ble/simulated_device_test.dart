@@ -1,11 +1,12 @@
 import 'package:fake_async/fake_async.dart';
 import 'package:test/test.dart';
 
-import 'package:inclinometer/ble/api_catalog.dart';
+import 'package:inclinometer/devices/leveltronic/api_catalog.dart';
 import 'package:inclinometer/ble/api_v3.dart';
+import 'package:inclinometer/devices/leveltronic/protocol.dart';
 import 'package:inclinometer/ble/device_link.dart';
-import 'package:inclinometer/ble/instrument_api.dart';
-import 'package:inclinometer/ble/simulated_device.dart';
+import 'package:inclinometer/devices/leveltronic/instrument_api.dart';
+import 'package:inclinometer/devices/leveltronic/simulated_device.dart';
 
 import '../support/harness.dart';
 

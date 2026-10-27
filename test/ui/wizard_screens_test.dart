@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:inclinometer/ble/api_catalog.dart';
-import 'package:inclinometer/ui/widgets/instrument_diagram.dart';
+import 'package:inclinometer/devices/leveltronic/api_catalog.dart';
+import 'package:inclinometer/devices/leveltronic/ui/widgets/instrument_diagram.dart';
 
 import '../support/app_harness.dart';
 
@@ -33,7 +33,7 @@ void main() {
     testWidgets('lists the three wizards in order and the service state',
         (tester) async {
       final h = await AppHarness.start(tester,
-          location: '/instrument/calibration');
+          location: '/leveltronic/calibration');
       expect(find.text('Phase'), findsOneWidget);
       expect(find.text('Gain (sensitivity)'), findsOneWidget);
       expect(find.text('Zero (flip)'), findsOneWidget);
@@ -46,7 +46,7 @@ void main() {
 
     testWidgets('opens each wizard', (tester) async {
       final h = await AppHarness.start(tester,
-          location: '/instrument/calibration');
+          location: '/leveltronic/calibration');
       await tester.tap(find.byKey(const ValueKey('cal-phase')));
       await h.pump(tester, const Duration(milliseconds: 600));
       expect(find.text('Phase calibration'), findsOneWidget);
@@ -65,7 +65,7 @@ void main() {
 
     testWidgets('can end service mode from the hub', (tester) async {
       final h = await AppHarness.start(tester,
-          location: '/instrument/calibration');
+          location: '/leveltronic/calibration');
       await turnServiceOn(tester, h);
       await tester.tap(find.text('Leave service mode'));
       await h.pump(tester, const Duration(seconds: 2));
@@ -76,7 +76,7 @@ void main() {
   });
 
   group('flip calibration screen', () {
-    const loc = '/instrument/calibration/flip';
+    const loc = '/leveltronic/calibration/flip';
 
     testWidgets('cannot start until service mode is on, and says how',
         (tester) async {
@@ -171,7 +171,7 @@ void main() {
   });
 
   group('phase calibration screen', () {
-    const loc = '/instrument/calibration/phase';
+    const loc = '/leveltronic/calibration/phase';
 
     testWidgets('leads through reference, tilt step and result',
         (tester) async {
@@ -249,7 +249,7 @@ void main() {
   });
 
   group('gain calibration screen', () {
-    const loc = '/instrument/calibration/gain';
+    const loc = '/leveltronic/calibration/gain';
 
     testWidgets('computes the known tilt from shim and edge', (tester) async {
       final h = await AppHarness.start(tester, location: loc);

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:inclinometer/config/build_flavor.dart';
-import 'package:inclinometer/models/device_state.dart';
+import 'package:inclinometer/models/connection.dart';
 import 'package:inclinometer/providers/device_provider.dart';
 import 'package:inclinometer/providers/update_provider.dart';
 import 'package:inclinometer/providers/version_provider.dart';
@@ -34,16 +34,18 @@ void resetUpdateDialogShownForTest() => _updateDialogShown = false;
 ///
 /// Displays scan state chip, a FAB to start/stop scanning, and a filtered list
 /// of discovered BLE devices (unnamed devices are hidden per SCAN-03).
-/// Navigates to /instrument via go_router when [connectionNotifierProvider]
-/// reaches [ConnectionStatus.connected].
+/// Navigates to the new device's home (its driver's route) via go_router when
+/// [connectionNotifierProvider] reaches [ConnectionStatus.connected]. Devices
+/// that are already open are listed on top; scanning again adds more.
 class ScanScreen extends ConsumerWidget {
   const ScanScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final status = ref.watch(connectionNotifierProvider);
+    final open = ref.watch(sessionsProvider);
     final devices = ref.watch(scanResultsProvider)
-        .where((d) => d.name.isNotEmpty)
+        .where((d) => d.name.isNotEmpty && !open.contains(d.id))
         .toList();
 
     // Watch permanently-denied state for inline banner (D-02).
@@ -52,13 +54,15 @@ class ScanScreen extends ConsumerWidget {
     // Version string stamped by the build system — empty while loading.
     final version = ref.watch(versionProvider).asData?.value ?? '';
 
-    // Navigate to /instrument via go_router on connect (RESEARCH.md Pitfall 4).
+    // Navigate to the active device's home via go_router on connect (RESEARCH.md Pitfall 4).
     // Guard: prev != connected prevents duplicate navigation when provider
     // rebuilds while already connected (e.g. scan-revision increment).
     ref.listen(connectionNotifierProvider, (prev, next) {
       if (next == ConnectionStatus.connected &&
           prev != ConnectionStatus.connected) {
-        context.go('/instrument');
+        context.go(
+          ref.read(activeSessionProvider)?.driver.homeLocation ?? '/scan',
+        );
       }
     });
 
@@ -100,6 +104,7 @@ class ScanScreen extends ConsumerWidget {
     final showFab = status == ConnectionStatus.idle ||
         status == ConnectionStatus.disconnected ||
         status == ConnectionStatus.scanning ||
+        status == ConnectionStatus.connected ||
         status == ConnectionStatus.error;
 
     return Scaffold(
@@ -153,6 +158,7 @@ class ScanScreen extends ConsumerWidget {
       body: Column(
         children: [
           if (permanentlyDenied) _buildPermissionDeniedBanner(),
+          if (!open.isEmpty) _buildOpenDevices(context, ref, open),
           Expanded(child: _buildBody(context, ref, status, devices)),
           if (version.isNotEmpty)
             Padding(
@@ -217,6 +223,39 @@ class ScanScreen extends ConsumerWidget {
     }
 
     return _buildDeviceList(ref, devices);
+  }
+
+  Widget _buildOpenDevices(
+    BuildContext context,
+    WidgetRef ref,
+    OpenSessions open,
+  ) {
+    return Column(
+      children: [
+        for (final s in open.all)
+          ListTile(
+            key: ValueKey('open-${s.id}'),
+            tileColor: const Color(0xFF1B2E1F),
+            leading: const Icon(Icons.bluetooth_connected,
+                color: Colors.white70, size: 20),
+            title: Text(
+              s.label,
+              style: const TextStyle(fontSize: 16, color: Colors.white),
+            ),
+            onTap: () {
+              ref.read(sessionsProvider.notifier).activate(s.id);
+              context.go(s.driver.homeLocation);
+            },
+            trailing: IconButton(
+              tooltip: 'Disconnect',
+              icon: const Icon(Icons.link_off, size: 20),
+              onPressed: () => ref
+                  .read(connectionNotifierProvider.notifier)
+                  .disconnect(deviceId: s.id),
+            ),
+          ),
+      ],
+    );
   }
 
   Widget _buildDeviceList(WidgetRef ref, List<ScannedDevice> devices) {

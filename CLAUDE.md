@@ -12,20 +12,34 @@ instrument (STM32G0B1 / RN4871). The scaffold was built mock-first (phases
 The firmware is `InclinationMeterFirmware` (repo also named "WylerLeveltronic").
 **Protocol:** its `docs/api-v3-spec.md`; **every resource:** its
 `docs/api-reference.md` (generated from `tools/api_spec.py`). The app speaks
-API v3 only — `BleManager.connect` reads System IDENTITY and refuses anything
-else (`IncompatibleFirmwareException`, shown on the scan screen).
+API v3 only — the Leveltronic driver refuses anything else
+(`IncompatibleFirmwareException`, shown on the scan screen).
 
 - **Transport:** RN4871 **Transparent UART** — a raw byte stream carrying
   framed packets `[OPCODE 2B LE][LEN 2B LE][PAYLOAD][CRC16 2B LE]`,
   CRC-16/CCITT-FALSE. Service `49535343-FE7D-…`, write `…8841-…`, notify
   `…1E4D-…`; advertises as `Leveltronic-<last 2 MAC bytes>`. Max payload 122.
-- **Layering (keep it):**
-  `lib/ble/api_v3.dart` (framing, opcodes, decoders; pure Dart) →
-  `device_link.dart` (`DeviceLink`: `request()` + `subscribe()`) →
-  `instrument_api.dart` (typed operations) →
+- **Layering (keep it):** shared and device-agnostic:
+  `lib/ble/api_v3.dart` (framing, opcode scheme, status, System IDENTITY; pure
+  Dart) → `device_link.dart` (`DeviceLink`: `request()` + `subscribe()`;
+  `DeviceConnection` adds id / closed / close) → `BleManager` (scan +
+  `open(id)`, any number of connections at once; `RealBleManager` over
+  `flutter_blue_plus`, `MockBleManager` over `SimulatedPeripheral`s). Per
+  device family, in `lib/devices/<device>/`: `protocol.dart` (resource ids +
+  payload decoders) → `instrument_api.dart` (typed operations) →
   `live_feed.dart` (the always-on subscriptions) → providers → screens.
-  `RealBleManager` is only a `DeviceLink` over `flutter_blue_plus`;
-  `MockBleManager` puts `SimulatedDevice` behind the same link.
+- **Multiple devices** (`lib/devices/device_driver.dart`): a `DeviceDriver`
+  per family (id, advertised-name prefixes, `claims(ApiIdentity)`, `open()`,
+  route tree at `/<id>`). `DeviceRegistry` (listed in `main.dart`) reads System
+  IDENTITY `product` after connect and picks the driver, whose `DeviceSession`
+  (`LeveltronicSession` = api + live feed) lives as long as the connection.
+  `sessionsProvider` holds all open sessions; `activeSessionProvider` is the
+  one the device screens show (`DeviceSwitcherButton` switches;
+  `ActiveSessionRedirect` on each home screen follows it). A driver's
+  providers read the session from `activeSessionProvider`. **Adding a
+  device:** new `lib/devices/<x>/` with a driver + session, add it to the
+  registry in `main.dart` — no change to transport, router or scan screen.
+- **NeigMess2** (`lib/devices/neigmess2/`, API in its `docs/device_api.md`) is  the second driver: same framing/UUIDs, but API v2 — IDENTITY is the 19-byte  layout (`ApiIdentity.decode` handles both), no serial (labels fall back to  the BLE address tail), sensor values are *sensor units* not pF (`kUnitToPf`),  writes to the EEPROM on zero/clear/store/SET. It needs BLE writes of ≤ 20  bytes: `RealBleManager._send` chunks to the ATT MTU. Not implemented yet:  bulk transfers (raw stream) and the debug-log subscription (bulk chunks would  need their own push framing: `ApiFrame.looksLikePush` assumes `[seq][page]`).
 - **Subscriptions, not polling.** `DeviceLink.subscribe` shares one device
   subscription between listeners and UNSUBSCRIBEs when the last leaves.
   Always on: Topics LIVE (event, ~4 Hz), STATUS (1 s), ENV (2 s). Per screen:
@@ -97,11 +111,12 @@ Config: YOLO mode, standard granularity, parallel execution, research + plan-che
 - The concrete manager is chosen once, in `main.dart`, via
   `ProviderScope`/`ProviderContainer` override — `RealBleManager()` for
   hardware, `MockBleManager()` to run/test without a device.
-- Protocol framing + decoders live in `lib/ble/api_v3.dart` (pure Dart, no BLE
+- Protocol framing lives in `lib/ble/api_v3.dart`, a device's payload decoders in
+  `lib/devices/<device>/protocol.dart` (pure Dart, no BLE
   import, unit-tested in `test/ble/api_v3_test.dart`). `RealBleManager` owns
   packet reassembly; `LiveFeed` merges the topic subscriptions into
   `DeviceState?` for the providers.
-- `BleManager.deviceStream` emits `DeviceState?` — `null` is the stale-data
+- `instrumentDataProvider` emits `DeviceState?` — `null` is the stale-data
   sentinel on disconnect/error. Never render last-known values as live.
 - Riverpod 3.x — use `Notifier`/`AsyncNotifier`, not `StateNotifierProvider`
   (legacy).
@@ -151,5 +166,6 @@ Two Android product flavors (dimension `distribution`, same `applicationId`):
   `BLUETOOTH_CONNECT`, rationale dialog before the system prompt).
 - Stale-data indicator required — never show last-known values as live after
   disconnect.
-- Scan filters advertisements by the `Leveltronic` name prefix (the module
-  does not advertise the 128-bit Transparent-UART service UUID).
+- Scan filters advertisements by the drivers' name prefixes (`Leveltronic`,
+  `NeigMess2`); the modules do not advertise the 128-bit Transparent-UART
+  service UUID. The driver is chosen after connect from IDENTITY `product`.

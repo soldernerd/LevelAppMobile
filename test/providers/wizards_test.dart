@@ -3,12 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:inclinometer/ble/api_catalog.dart';
+import 'package:inclinometer/devices/leveltronic/api_catalog.dart';
 import 'package:inclinometer/ble/api_v3.dart';
-import 'package:inclinometer/providers/flip_cal_provider.dart';
-import 'package:inclinometer/providers/gain_cal_provider.dart';
-import 'package:inclinometer/providers/phase_cal_provider.dart';
-import 'package:inclinometer/providers/precision_provider.dart';
+import 'package:inclinometer/devices/leveltronic/protocol.dart';
+import 'package:inclinometer/devices/leveltronic/providers/flip_cal_provider.dart';
+import 'package:inclinometer/devices/leveltronic/providers/gain_cal_provider.dart';
+import 'package:inclinometer/devices/leveltronic/providers/phase_cal_provider.dart';
+import 'package:inclinometer/devices/leveltronic/providers/precision_provider.dart';
 
 import '../support/harness.dart';
 
@@ -61,7 +62,7 @@ void main() {
     test('reports a refusal from the device', () {
       fakeAsync((async) {
         final h = SimHarness()..connect(async);
-        settle(async, h.mock.request(opExecute(CmdRes.tiltDemod), [0]));
+        settle(async, h.mock.sim.request(opExecute(CmdRes.tiltDemod), [0]));
         final state = hold(h.container, precisionProvider);
         h.container.read(precisionProvider.notifier).start();
         pass(async, const Duration(seconds: 1));
@@ -82,7 +83,7 @@ void main() {
         expect(state().stage, equals(PrecisionStage.idle));
         pass(async, const Duration(seconds: 4));
         expect(state().stage, equals(PrecisionStage.idle));
-        final s = settle(async, h.mock.request(opGet(ApiCat.procedures, ProcRes.precision)));
+        final s = settle(async, h.mock.sim.request(opGet(ApiCat.procedures, ProcRes.precision)));
         expect(s.data[0], equals(PrecisionPhase.idle.value));
       });
     });
@@ -326,7 +327,7 @@ void main() {
         final n = h.container.read(phaseCalProvider.notifier);
         n.begin();
         // The demodulation is stopped: no usable phasor stream.
-        settle(async, h.mock.request(opExecute(CmdRes.tiltDemod), [0]));
+        settle(async, h.mock.sim.request(opExecute(CmdRes.tiltDemod), [0]));
         h.sim.linkDown();
         n.captureReference();
         pass(async, const Duration(seconds: 10));

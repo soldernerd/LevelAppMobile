@@ -1,4 +1,4 @@
-/// The transport-independent view of an open connection to the instrument:
+/// The transport-independent view of an open connection to a device:
 /// send an API request and get its reply, or subscribe to a resource and get
 /// its pushes. `RealBleManager` implements it over BLE; the simulator behind
 /// `MockBleManager` implements it in memory. Everything above this line
@@ -91,4 +91,41 @@ abstract class DeviceLink {
     int intervalMs = 250,
     List<int>? payload,
   });
+}
+
+/// A [DeviceLink] that was opened by a [BleManager] to one particular device:
+/// it knows which one, and when it is gone. A manager can hold several of these
+/// at once; each has its own request correlation and subscriptions.
+abstract class DeviceConnection implements DeviceLink {
+  /// The BLE address / peripheral id this connection was opened to.
+  String get id;
+
+  /// Completes (never with an error) when the link is down — closed on
+  /// purpose, dropped by the device, or lost.
+  Future<void> get closed;
+
+  /// Ends the connection and everything riding on it. Safe to call twice.
+  Future<void> close();
+}
+
+/// The link of "no device": every request fails the way one on a dropped
+/// connection does.
+class DisconnectedLink implements DeviceLink {
+  const DisconnectedLink();
+
+  @override
+  Future<ApiReply> request(
+    int opcode, [
+    List<int> payload = const [],
+    Duration? timeout,
+  ]) =>
+      Future<ApiReply>.error(const LinkException('not connected'));
+
+  @override
+  Stream<Uint8List> subscribe(
+    int subscribeOpcode, {
+    int intervalMs = 250,
+    List<int>? payload,
+  }) =>
+      Stream<Uint8List>.error(const LinkException('not connected'));
 }

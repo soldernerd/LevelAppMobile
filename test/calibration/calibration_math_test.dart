@@ -2,7 +2,7 @@ import 'dart:math';
 
 import 'package:test/test.dart';
 
-import 'package:inclinometer/calibration/calibration_math.dart';
+import 'package:inclinometer/devices/leveltronic/calibration/calibration_math.dart';
 
 /// A capture of `u = (zero + tilt·k)·e^{jφ}` with a little noise.
 ComplexStats capture(double tilt,

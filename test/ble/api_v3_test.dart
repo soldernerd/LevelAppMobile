@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:test/test.dart';
 
 import 'package:inclinometer/ble/api_v3.dart';
+import 'package:inclinometer/devices/leveltronic/protocol.dart';
 
 void main() {
   group('crc16Ccitt', () {
@@ -180,8 +181,19 @@ void main() {
       expect(id.build, equals('1371e8b0-dirty'));
     });
 
-    test('a v2 IDENTITY (27 bytes) does not decode', () {
+    test('a 27-byte IDENTITY (an old Leveltronic v2) does not decode', () {
       expect(ApiIdentity.decode(Uint8List(27)), isNull);
+    });
+
+    test('the 19-byte v2 IDENTITY of the NeigMess2 decodes as API v2', () {
+      final b = Uint8List(19);
+      b.setRange(0, 3, [0, 1, 0]);
+      b.setRange(3, 3 + 9, 'NeigMess2'.codeUnits);
+      final id = ApiIdentity.decode(b)!;
+      expect(id.firmware, equals('0.1.0'));
+      expect(id.apiVersion, equals(2));
+      expect(id.product, equals('NeigMess2'));
+      expect(id.serial, isEmpty);
     });
 
     test('STATE / STATUS (15 bytes)', () {

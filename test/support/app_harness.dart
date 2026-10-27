@@ -5,8 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:inclinometer/ble/mock_ble_manager.dart';
-import 'package:inclinometer/ble/simulated_device.dart';
+import 'package:inclinometer/devices/leveltronic/simulated_device.dart';
 import 'package:inclinometer/providers/device_provider.dart';
+import 'registry.dart';
 import 'package:inclinometer/router.dart';
 
 /// The whole app (real router, real providers) on a simulated instrument.
@@ -24,7 +25,7 @@ class AppHarness {
   static Future<AppHarness> start(
     WidgetTester tester, {
     SimulatedDevice? device,
-    String location = '/instrument',
+    String location = '/leveltronic',
     Map<String, Object> prefs = const {},
     GlobalKey? repaintKey,
     ThemeData? theme,
@@ -35,11 +36,15 @@ class AppHarness {
 
     final mock = MockBleManager(device: device ?? SimulatedDevice());
     final container = ProviderContainer(
-      overrides: [bleManagerProvider.overrideWithValue(mock)],
+      overrides: [
+        bleManagerProvider.overrideWithValue(mock),
+        deviceRegistryProvider.overrideWithValue(testRegistry),
+      ],
     );
     late final GoRouter router;
     router = buildRouter(
-      readStatus: () => container.read(connectionNotifierProvider),
+      registry: testRegistry,
+      readActive: () => container.read(activeSessionProvider),
     );
     Widget app = MaterialApp.router(
       theme: theme ?? ThemeData.dark(),

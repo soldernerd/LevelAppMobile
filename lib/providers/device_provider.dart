@@ -5,10 +5,9 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'package:inclinometer/ble/ble_manager.dart';
-import 'package:inclinometer/ble/instrument_api.dart';
-import 'package:inclinometer/ble/live_feed.dart';
 import 'package:inclinometer/ble/mock_ble_manager.dart';
-import 'package:inclinometer/models/device_state.dart';
+import 'package:inclinometer/devices/device_driver.dart';
+import 'package:inclinometer/models/connection.dart';
 
 /// Root-level provider for the BLE manager.
 ///
@@ -20,43 +19,115 @@ final bleManagerProvider = Provider<BleManager>((ref) {
   throw UnimplementedError('bleManagerProvider must be overridden at root');
 });
 
-/// The typed API over the open link. Everything above the transport talks to
-/// the instrument through this.
-final instrumentApiProvider = Provider<InstrumentApi>((ref) {
-  return InstrumentApi(ref.watch(bleManagerProvider));
+/// The device drivers this build knows. Overridden at the root like
+/// [bleManagerProvider]; tests and `main.dart` list the drivers they want.
+final deviceRegistryProvider = Provider<DeviceRegistry>((ref) {
+  throw UnimplementedError('deviceRegistryProvider must be overridden at root');
 });
 
 /// Why the last connect / scan failed, for the scan screen. Null when the
 /// failure had no more specific cause than "Bluetooth".
 final connectionErrorProvider = StateProvider<String?>((ref) => null);
 
+/// The open devices, and which one the UI is focused on.
+class OpenSessions {
+  const OpenSessions(this.all, this.activeId);
+
+  static const none = OpenSessions([], null);
+
+  final List<DeviceSession> all;
+  final String? activeId;
+
+  DeviceSession? get active {
+    for (final s in all) {
+      if (s.id == activeId) return s;
+    }
+    return null;
+  }
+
+  bool get isEmpty => all.isEmpty;
+  bool contains(String id) => all.any((s) => s.id == id);
+}
+
+/// Owns the [DeviceSession]s: any number of devices can be connected at once,
+/// each running its own feeds; one of them is the *active* one that the
+/// device screens show. A session leaves the list when its link goes down.
+class SessionsNotifier extends Notifier<OpenSessions> {
+  final _sessions = <DeviceSession>[];
+  String? _activeId;
+
+  @override
+  OpenSessions build() {
+    ref.keepAlive();
+    ref.onDispose(() {
+      for (final s in _sessions) {
+        unawaited(s.close());
+      }
+      _sessions.clear();
+    });
+    return OpenSessions.none;
+  }
+
+  /// Adds a freshly opened session and makes it the active one.
+  void add(DeviceSession session) {
+    _sessions.removeWhere((s) => s.id == session.id);
+    _sessions.add(session);
+    _activeId = session.id;
+    _publish();
+    unawaited(session.closed.then<void>((_) => _drop(session)));
+  }
+
+  void activate(String id) {
+    if (!_sessions.any((s) => s.id == id) || _activeId == id) return;
+    _activeId = id;
+    _publish();
+  }
+
+  /// Closes the session with [id]; it leaves the list once its link is down.
+  Future<void> close(String id) async {
+    for (final s in _sessions.toList()) {
+      if (s.id != id) continue;
+      await s.close();
+      _drop(s);
+    }
+  }
+
+  void _drop(DeviceSession session) {
+    // A newer session for the same device may have replaced this one.
+    if (!_sessions.remove(session)) return;
+    if (_activeId == session.id) {
+      _activeId = _sessions.isEmpty ? null : _sessions.last.id;
+    }
+    _publish();
+  }
+
+  void _publish() =>
+      state = OpenSessions(List.unmodifiable(_sessions), _activeId);
+}
+
+final sessionsProvider =
+    NotifierProvider<SessionsNotifier, OpenSessions>(SessionsNotifier.new);
+
+/// The session the device screens show, or null. Changes only when the
+/// active device changes, not when other sessions come and go.
+final activeSessionProvider = Provider<DeviceSession?>((ref) {
+  return ref.watch(sessionsProvider.select((s) => s.active));
+});
+
 /// Connection state machine notifier.
 ///
-/// Owns the full [ConnectionStatus] state machine from idle through
-/// reconnecting, accumulates scan results, manages the wakelock and — while
-/// connected — runs the [LiveFeed], forwarding its merged [DeviceState]s
-/// (and a null stale sentinel on disconnect/error) to [instrumentStream].
+/// Owns the [ConnectionStatus] of the scan / connect flow, accumulates scan
+/// results and manages the wakelock. [ConnectionStatus.connected] means at
+/// least one device is open and nothing else is going on; the devices
+/// themselves are in [sessionsProvider].
 class ConnectionNotifier extends Notifier<ConnectionStatus> {
   // Auto-reconnect is a stub: structure in place, not active.
   static const bool _autoReconnectEnabled = false;
 
-  // broadcast() — multi-subscriber safe; no "already listened" error
-  final _packetController = StreamController<DeviceState?>.broadcast();
   final _scannedDevices = <ScannedDevice>[];
-
-  LiveFeed? _feed;
-  StreamSubscription<DeviceState>? _feedSub;
-
-  /// Broadcast stream of merged instrument snapshots.
-  ///
-  /// Emits null on disconnect/error (stale sentinel).
-  Stream<DeviceState?> get instrumentStream => _packetController.stream;
 
   /// Unmodifiable snapshot of accumulated scan results.
   List<ScannedDevice> get scannedDevices => List.unmodifiable(_scannedDevices);
-
-  /// The last merged state while connected, else null.
-  DeviceState? get currentState => _feed?.state;
 
   @override
   ConnectionStatus build() {
@@ -68,7 +139,13 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
 
     final manager = ref.read(bleManagerProvider);
 
-    final statusSub = manager.connectionStatus.listen(_handleStatusEvent);
+    final scanningSub = manager.scanning.listen((scanning) {
+      if (scanning) {
+        state = ConnectionStatus.scanning;
+      } else if (state == ConnectionStatus.scanning) {
+        state = _resting;
+      }
+    });
 
     final scanSub = manager.scanResults.listen((device) {
       if (!_scannedDevices.contains(device)) {
@@ -79,65 +156,43 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
       }
     });
 
+    ref.listen(sessionsProvider, (prev, next) {
+      final had = !(prev?.isEmpty ?? true);
+      if (next.isEmpty && had) {
+        WakelockPlus.disable().catchError((_) {});
+        state = _autoReconnectEnabled
+            ? ConnectionStatus.reconnecting
+            : ConnectionStatus.disconnected;
+      } else if (!next.isEmpty && !had) {
+        // .catchError: async platform channel may throw in test environments.
+        WakelockPlus.enable().catchError((_) {});
+      }
+    });
+
     ref.onDispose(() {
-      statusSub.cancel();
+      scanningSub.cancel();
       scanSub.cancel();
-      _stopFeed();
-      _packetController.close();
-      // .catchError: async platform channel may throw in test environments.
       WakelockPlus.disable().catchError((_) {});
     });
 
     return ConnectionStatus.idle;
   }
 
-  void _handleStatusEvent(ConnectionStatus status) {
-    state = status;
+  /// What the status is when no scan or connect is in flight.
+  ConnectionStatus get _resting => ref.read(sessionsProvider).isEmpty
+      ? ConnectionStatus.idle
+      : ConnectionStatus.connected;
 
-    if (status == ConnectionStatus.connected) {
-      WakelockPlus.enable().catchError((_) {});
-      _startFeed();
-    } else if (status == ConnectionStatus.disconnected ||
-        status == ConnectionStatus.error) {
-      WakelockPlus.disable().catchError((_) {});
-      _stopFeed();
-
-      // Stale sentinel: the UI must not show last-known values as live.
-      if (!_packetController.isClosed) {
-        _packetController.add(null);
-      }
-
-      if (_autoReconnectEnabled) {
-        state = ConnectionStatus.reconnecting;
-      }
-    }
-  }
-
-  void _startFeed() {
-    _stopFeed();
-    final feed = LiveFeed(ref.read(instrumentApiProvider));
-    _feed = feed;
-    _feedSub = feed.stream.listen((s) {
-      if (!_packetController.isClosed) _packetController.add(s);
-    });
-    feed.start();
-  }
-
-  void _stopFeed() {
-    _feedSub?.cancel();
-    _feedSub = null;
-    final feed = _feed;
-    _feed = null;
-    if (feed != null) unawaited(feed.stop());
-  }
-
-  /// Clears accumulated scan results and starts a new BLE scan.
+  /// Clears accumulated scan results and starts a new BLE scan for the
+  /// advertised names of the registered drivers.
   Future<void> startScan() async {
     _scannedDevices.clear();
     ref.read(_scanRevisionProvider.notifier).reset();
     ref.read(connectionErrorProvider.notifier).state = null;
     try {
-      await ref.read(bleManagerProvider).startScan();
+      await ref.read(bleManagerProvider).startScan(
+            accept: ref.read(deviceRegistryProvider).acceptsAdvertisedName,
+          );
     } catch (e) {
       state = ConnectionStatus.error;
     }
@@ -151,26 +206,45 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
     }
   }
 
-  /// Connects to [deviceId]. On failure sets [ConnectionStatus.error] and, for
-  /// an instrument that does not speak API v3, a specific message in
+  /// Connects to [deviceId], identifies it and opens its session; the new
+  /// device becomes the active one. On failure sets [ConnectionStatus.error]
+  /// and, for a device the app cannot use, a specific message in
   /// [connectionErrorProvider].
   Future<void> connect(String deviceId) async {
     ref.read(connectionErrorProvider.notifier).state = null;
+    final sessions = ref.read(sessionsProvider.notifier);
+    if (ref.read(sessionsProvider).contains(deviceId)) {
+      sessions.activate(deviceId);
+      state = ConnectionStatus.connected;
+      return;
+    }
     try {
-      await ref.read(bleManagerProvider).connect(deviceId);
-    } on IncompatibleFirmwareException catch (e) {
+      final manager = ref.read(bleManagerProvider);
+      await manager.stopScan();
+      state = ConnectionStatus.connecting;
+      final connection = await manager.open(deviceId);
+      final session =
+          await ref.read(deviceRegistryProvider).openSession(connection);
+      sessions.add(session);
+      state = ConnectionStatus.connected;
+    } on ConnectFailure catch (e) {
       ref.read(connectionErrorProvider.notifier).state = e.message;
       state = ConnectionStatus.error;
     } catch (e) {
       ref.read(connectionErrorProvider.notifier).state =
-          'Could not connect to the instrument.';
+          'Could not connect to the device.';
       state = ConnectionStatus.error;
     }
   }
 
-  Future<void> disconnect() async {
+  /// Disconnects [deviceId], or the active device.
+  Future<void> disconnect({String? deviceId}) async {
+    final open = ref.read(sessionsProvider);
+    final id = deviceId ?? open.activeId;
+    if (id == null) return;
     try {
-      await ref.read(bleManagerProvider).disconnect();
+      if (open.all.length == 1) state = ConnectionStatus.disconnecting;
+      await ref.read(sessionsProvider.notifier).close(id);
     } catch (e) {
       state = ConnectionStatus.error;
     }
@@ -181,7 +255,8 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
   /// the mock. No-op on the real manager.
   void debugSimulateDisconnect() {
     final mgr = ref.read(bleManagerProvider);
-    if (mgr is MockBleManager) mgr.simulateDisconnect();
+    final id = ref.read(sessionsProvider).activeId;
+    if (mgr is MockBleManager) mgr.simulateDisconnect(id);
   }
 }
 
@@ -206,18 +281,6 @@ final _scanRevisionProvider =
 final scanResultsProvider = Provider<List<ScannedDevice>>((ref) {
   ref.watch(_scanRevisionProvider);
   return ref.watch(connectionNotifierProvider.notifier).scannedDevices;
-});
-
-/// StreamProvider exposing live instrument data as [DeviceState?].
-///
-/// Null values indicate stale data (disconnect/error sentinel).
-final instrumentDataProvider = StreamProvider<DeviceState?>((ref) async* {
-  final notifier = ref.watch(connectionNotifierProvider.notifier);
-  // A late subscriber (a screen opened mid-session) gets the last merged
-  // state at once instead of waiting for the next push.
-  final current = notifier.currentState;
-  if (current != null) yield current;
-  yield* notifier.instrumentStream;
 });
 
 /// Whether BLE permissions are permanently denied on this device.

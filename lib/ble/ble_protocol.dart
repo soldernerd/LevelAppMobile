@@ -1,4 +1,4 @@
-/// GATT identifiers and scan parameters for the Leveltronic instrument.
+/// GATT identifiers of the shared BLE transport.
 ///
 /// The instrument's BLE link is a Microchip RN4871 module in **Transparent
 /// UART** mode — a raw byte stream carrying framed API v3 packets (see
@@ -14,7 +14,3 @@ const String kRxCharUuid = '49535343-8841-43f4-a8d4-ecbe34729bb3';
 
 /// Module → host: responses and subscription pushes arrive as notifications.
 const String kTxCharUuid = '49535343-1e4d-4bd9-ba61-23c647249616';
-
-/// The instrument advertises as `Leveltronic-<last 2 MAC bytes>`
-/// (firmware `Config/config.h` `BLE_DEVICE_NAME`). Scans filter on this prefix.
-const String kDeviceNamePrefix = 'Leveltronic';

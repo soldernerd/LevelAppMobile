@@ -5,8 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:inclinometer/ble/mock_ble_manager.dart';
-import 'package:inclinometer/models/device_state.dart';
+import 'package:inclinometer/models/connection.dart';
+import 'package:inclinometer/devices/leveltronic/device_state.dart';
 import 'package:inclinometer/providers/device_provider.dart';
+import '../support/registry.dart';
+import 'package:inclinometer/devices/leveltronic/providers/leveltronic_provider.dart';
 
 // ignore: unused_import — imported for DeviceState type assertions in comments
 import 'package:inclinometer/ble/ble_protocol.dart';
@@ -16,7 +19,10 @@ import 'package:inclinometer/ble/ble_protocol.dart';
 /// Registers [container.dispose] and [mock.dispose] as teardowns.
 ProviderContainer buildContainer(MockBleManager mock) {
   final container = ProviderContainer(
-    overrides: [bleManagerProvider.overrideWithValue(mock)],
+    overrides: [
+      bleManagerProvider.overrideWithValue(mock),
+      deviceRegistryProvider.overrideWithValue(testRegistry),
+    ],
   );
   addTearDown(container.dispose);
   addTearDown(mock.dispose);
@@ -37,10 +43,9 @@ void main() {
         // Subscribe BEFORE connecting — broadcast streams don't buffer (PITFALL-3).
         // instrumentDataProvider.stream is available on the notifier.
         final collected = <DeviceState?>[];
-        container
-            .read(connectionNotifierProvider.notifier)
-            .instrumentStream
-            .listen(collected.add);
+        container.listen(instrumentDataProvider, (_, next) {
+          if (next.hasValue) collected.add(next.value);
+        });
 
         container
             .read(connectionNotifierProvider.notifier)
@@ -64,10 +69,9 @@ void main() {
 
         // Subscribe BEFORE connecting — broadcast streams don't buffer (PITFALL-3 / T-03-07).
         final collected = <DeviceState?>[];
-        container
-            .read(connectionNotifierProvider.notifier)
-            .instrumentStream
-            .listen(collected.add);
+        container.listen(instrumentDataProvider, (_, next) {
+          if (next.hasValue) collected.add(next.value);
+        });
 
         container
             .read(connectionNotifierProvider.notifier)

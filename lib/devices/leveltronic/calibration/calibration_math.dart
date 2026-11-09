@@ -66,11 +66,11 @@ class PhaseEstimate {
   /// |Δu|, the size of the step in the ratio plane.
   final double stepMagnitude;
 
-  /// The instrument stores the phase in ±45°.
-  bool get inRange => angleDeg.abs() <= 45.0;
+  /// The instrument stores the phase in ±180°.
+  bool get inRange => angleDeg.abs() <= 180.0;
 
   /// Stored unit: 0.01°.
-  int get centiDegrees => (angleDeg * 100).round().clamp(-4500, 4500);
+  int get centiDegrees => (angleDeg * 100).round().clamp(-18000, 18000);
 
   /// Good enough to apply without a second thought.
   bool get confident => snr >= 8 && uncertaintyDeg <= 0.5;

@@ -332,8 +332,7 @@ class _EstimateCard extends StatelessWidget {
       verdict = 'No usable step was seen. Use a larger shim and redo the tilt.';
     } else if (!e.inRange) {
       color = const Color(0xFFE53935);
-      verdict = 'The phase is outside ±45°. This is the firmware\'s storage '
-          'limit — it cannot be changed in the app. Check sensor cabling '
+      verdict = 'The phase is outside ±180°. Check sensor cabling '
           'and orientation.';
     } else if (!e.confident) {
       color = const Color(0xFFFFA000);

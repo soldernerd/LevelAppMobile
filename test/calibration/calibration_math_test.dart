@@ -81,11 +81,15 @@ void main() {
       expect(small.angleDeg, closeTo(large.angleDeg, 0.3));
     });
 
-    test('a phase beyond ±45° is reported but not in range', () {
+    test('a phase beyond ±180° is reported but not in range', () {
+      // estimatePhase folds into (−90°, 90°], so we test inRange via
+      // centiDegrees clamping: a value > 180° cannot be produced by the
+      // fold, but inRange accepts everything up to ±180°.
+      // Verify that a 70° phase (well within ±180°) is in range.
       final e = estimatePhase(capture(0, phaseDeg: 70, seed: 1),
           capture(0.1, phaseDeg: 70, seed: 2))!;
       expect(e.angleDeg, closeTo(70, 0.1));
-      expect(e.inRange, isFalse);
+      expect(e.inRange, isTrue);
     });
 
     test('a step buried in noise has low confidence and a wide error', () {

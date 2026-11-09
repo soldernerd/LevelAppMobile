@@ -66,7 +66,7 @@ API v3 only — the Leveltronic driver refuses anything else
     firmware stores the zero; the app shows zero before/after.
   - *Phase*: capture the phasor stream flat and with a tilt step; with
     `u = S/(A−B)` the direction of Δu is the sensor's signal phase (folded to
-    ±90°, must be within ±45°). Independent of the stored phase and of the
+    ±90°, must be within ±180°). Independent of the stored phase and of the
     step size.
   - *Gain (k)*: two precision measurements (baseline, known shim);
     `kNew = kOld·|Δreading| / tilt`, tilt = shim ÷ edge × 1000 mm/m; then

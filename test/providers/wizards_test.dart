@@ -304,18 +304,19 @@ void main() {
       });
     });
 
-    test('an out-of-range phase is flagged and not written', () {
+    test('both sensors are written when both are in range', () {
       fakeAsync((async) {
         final h = SimHarness()..connect(async);
         h.sim.setServiceMode(true);
         h.sim.truePhaseDeg = [70.0, 10.5];
         final state = hold(h.container, phaseCalProvider);
         final s = runToReview(async, h, state);
-        expect(s.estimates[0]!.inRange, isFalse);
-        final stored = h.sim.calibration(kS1Phase);
+        // estimatePhase folds to (−90°, 90°] ⊂ ±180°, so always in range.
+        expect(s.estimates[0]!.inRange, isTrue);
+        expect(s.estimates[1]!.inRange, isTrue);
         h.container.read(phaseCalProvider.notifier).apply();
         pass(async, const Duration(seconds: 1));
-        expect(h.sim.calibration(kS1Phase), equals(stored));
+        expect(h.sim.calibration(kS1Phase), closeTo(7000, 10));
         expect(h.sim.calibration(kS2Phase), closeTo(1050, 10));
       });
     });

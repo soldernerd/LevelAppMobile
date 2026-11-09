@@ -256,8 +256,8 @@ const ApiValueDef kS1Phase = ApiValueDef(
   description:
       'Phase of the tilt signal relative to the excitation reference.',
   type: ValType.i16,
-  min: -4500,
-  max: 4500,
+  min: -18000,
+  max: 18000,
   unit: '0.01°',
   service: true,
   group: 'Sensor 1',
@@ -304,8 +304,8 @@ const ApiValueDef kS2Phase = ApiValueDef(
   description:
       'Phase of the tilt signal relative to the excitation reference.',
   type: ValType.i16,
-  min: -4500,
-  max: 4500,
+  min: -18000,
+  max: 18000,
   unit: '0.01°',
   service: true,
   group: 'Sensor 2',

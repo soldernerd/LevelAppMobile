@@ -179,9 +179,11 @@ void main() {
       expect(find.text('Stored phase'), findsOneWidget);
       expect(find.text('+10.00°'), findsOneWidget);
 
+      await turnServiceOn(tester, h);
       await tester.tap(find.byKey(const ValueKey('phase-begin')));
       await h.pump(tester, const Duration(milliseconds: 400));
       expect(find.text('Reference'), findsOneWidget);
+      h.sim.setServiceMode(false);  // turn off so apply is blocked until re-enabled below
 
       h.sim.physicalTilt = [0.0, 0.0];
       await tester.tap(find.byKey(const ValueKey('phase-capture-ref')));
@@ -217,6 +219,7 @@ void main() {
 
     testWidgets('warns when there was no tilt step', (tester) async {
       final h = await AppHarness.start(tester, location: loc);
+      await turnServiceOn(tester, h);
       await tester.tap(find.byKey(const ValueKey('phase-begin')));
       await h.pump(tester, const Duration(milliseconds: 400));
       h.sim.physicalTilt = [0.0, 0.0];
@@ -234,6 +237,7 @@ void main() {
       final h = await AppHarness.start(tester, location: loc);
       await pickSensor(tester, 'S2');
       await h.pump(tester, const Duration(milliseconds: 300));
+      await turnServiceOn(tester, h);
       await tester.tap(find.byKey(const ValueKey('phase-begin')));
       await h.pump(tester, const Duration(milliseconds: 400));
       h.sim.physicalTilt = [0.0, 0.0];
@@ -253,14 +257,19 @@ void main() {
 
     testWidgets('computes the known tilt from shim and edge', (tester) async {
       final h = await AppHarness.start(tester, location: loc);
+      // Initial defaults: 0.1 mm shim on 150 mm baseline => 0.6667 mm/m each.
       expect(textOf(tester, find.byKey(const ValueKey('gain-known-tilt'))),
-          equals('Known tilt step: 0.1000 mm/m'));
-      await tester.enterText(find.byKey(const ValueKey('gain-height')), '0.25');
-      await tester.enterText(find.byKey(const ValueKey('gain-length')), '500');
+          contains('0.6667'));
+      await tester.enterText(
+          find.byKey(const ValueKey('gain-height-0')), '0.25');
+      await tester.enterText(
+          find.byKey(const ValueKey('gain-length-0')), '500');
       await tester.pump();
+      // S1 updated to 0.5000 mm/m; S2 stays at default.
       expect(textOf(tester, find.byKey(const ValueKey('gain-known-tilt'))),
-          equals('Known tilt step: 0.5000 mm/m'));
-      await tester.enterText(find.byKey(const ValueKey('gain-length')), '');
+          contains('S1: 0.5000'));
+      await tester.enterText(
+          find.byKey(const ValueKey('gain-length-0')), '');
       await tester.pump();
       expect(enabled(tester, 'gain-begin'), isFalse);
       await h.dispose(tester);
@@ -272,6 +281,18 @@ void main() {
       h.sim.setCalibration(kS2Phase, 1050);
       expect(find.text('45000'), findsOneWidget);
 
+      // Set known tilt to 0.1 mm/m (0.1 mm shim on 1000 mm) for each sensor.
+      await tester.enterText(
+          find.byKey(const ValueKey('gain-height-0')), '0.1');
+      await tester.enterText(
+          find.byKey(const ValueKey('gain-length-0')), '1000');
+      await tester.enterText(
+          find.byKey(const ValueKey('gain-height-1')), '0.1');
+      await tester.enterText(
+          find.byKey(const ValueKey('gain-length-1')), '1000');
+      await tester.pump();
+
+      await turnServiceOn(tester, h);
       await tester.tap(find.byKey(const ValueKey('gain-begin')));
       await h.pump(tester, const Duration(milliseconds: 400));
       expect(find.text('Baseline'), findsOneWidget);
@@ -289,10 +310,9 @@ void main() {
       expect(find.text('Result'), findsOneWidget);
       expect(textOf(tester, find.byKey(const ValueKey('gain-k-S1'))),
           matches(RegExp(r'^k 45000 to (4[89]|50)\d{3}$')));
-      expect(enabled(tester, 'gain-apply'), isFalse,
-          reason: 'service mode is off');
+      // Service mode on from turnServiceOn above.
+      expect(enabled(tester, 'gain-apply'), isTrue);
 
-      await turnServiceOn(tester, h);
       await tester.tap(find.byKey(const ValueKey('gain-apply')));
       await h.pump(tester, const Duration(seconds: 6));
       expect(find.text('Sensitivity stored'), findsOneWidget);
@@ -306,6 +326,7 @@ void main() {
       final h = await AppHarness.start(tester, location: loc);
       h.sim.setCalibration(kS1Phase, 1200);
       h.sim.setCalibration(kS2Phase, 1050);
+      await turnServiceOn(tester, h);
       await tester.tap(find.byKey(const ValueKey('gain-begin')));
       await h.pump(tester, const Duration(milliseconds: 400));
       h.sim.physicalTilt = [0.0, 0.0];

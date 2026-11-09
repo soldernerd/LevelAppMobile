@@ -298,7 +298,7 @@ void main() {
       expect(l.tiltDiff, closeTo(0.6234, 1e-6));
     });
 
-    test('SIGNAL_DIAG (56 bytes), channel order S2, B, A, S1', () {
+    test('SIGNAL_DIAG (56 bytes), channel order A, B, S1, S2', () {
       final b = Uint8List(56);
       final bd = ByteData.sublistView(b);
       for (var i = 0; i < 4; i++) {
@@ -309,7 +309,7 @@ void main() {
       bd.setFloat32(48, 0.25, Endian.little);
       bd.setFloat32(52, -0.25, Endian.little);
       final d = ApiSignalDiag.decode(b)!;
-      expect(ApiSignalDiag.channelNames, equals(['S2', 'B', 'A', 'S1']));
+      expect(ApiSignalDiag.channelNames, equals(['A', 'B', 'S1', 'S2']));
       expect(d.rmsMv, equals([10.0, 11.0, 12.0, 13.0]));
       expect(d.p2pMv, equals([30.0, 31.0, 32.0, 33.0]));
       expect(d.phaseDeg, equals([0.0, 90.0, 180.0, 270.0]));

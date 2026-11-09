@@ -143,9 +143,19 @@ class GainCalNotifier extends Notifier<GainCalState> {
       _run = null;
       if (r != null) unawaited(r.cancel());
     });
-    final serial = ref.watch(identityProvider).asData?.value.serial;
-    _serial = serial;
-    if (serial != null) _loadShim(serial);
+    // Use ref.listen (not ref.watch) so identity resolving doesn't rebuild
+    // and reset wizard state mid-calibration.
+    ref.listen(
+      identityProvider,
+      (_, next) {
+        final serial = next.asData?.value.serial;
+        if (serial != null && serial != _serial) {
+          _serial = serial;
+          _loadShim(serial);
+        }
+      },
+      fireImmediately: true,
+    );
     Future(refreshValues);
     return const GainCalState();
   }

@@ -96,7 +96,7 @@ void main() {
       expect(raw, isNot(contains('0.0000')));
 
       await tester.tap(find.byKey(const ValueKey('zero-diff')));
-      await h.pump(tester, const Duration(milliseconds: 600));
+      await h.pump(tester, const Duration(seconds: 4));
       expect(textOf(tester, reading('DIFF')), matches(RegExp(r'^[+−]0\.0000$')));
       expect(h.container.read(tareProvider), isNotNull);
       // S1 and S2 are untouched.
@@ -114,7 +114,7 @@ void main() {
     testWidgets('a long-press clears the zero', (tester) async {
       final h = await AppHarness.start(tester);
       await tester.tap(find.byKey(const ValueKey('zero-diff')));
-      await h.pump(tester, const Duration(milliseconds: 300));
+      await h.pump(tester, const Duration(seconds: 4));
       expect(h.container.read(tareProvider), isNotNull);
       await tester.longPress(find.byKey(const ValueKey('zero-diff')));
       await h.pump(tester, const Duration(milliseconds: 300));
@@ -123,22 +123,25 @@ void main() {
       await h.dispose(tester);
     });
 
-    testWidgets('asks first when the table is disturbed', (tester) async {
+    testWidgets('can be cancelled; shows failure when no quiet window',
+        (tester) async {
       final h = await AppHarness.start(tester);
-      h.sim.disturbed = true;
-      await h.pump(tester, const Duration(seconds: 1));
+
+      // Cancel mid-measurement: tare stays null.
       await tester.tap(find.byKey(const ValueKey('zero-diff')));
       await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('Reading is disturbed'), findsOneWidget);
+      expect(find.text('Taking a precision measurement…'), findsOneWidget);
       await tester.tap(find.text('Cancel'));
       await tester.pump(const Duration(milliseconds: 300));
       expect(h.container.read(tareProvider), isNull);
+      expect(find.text('Zero Diff'), findsOneWidget);
 
+      // Failure path: no clean window found.
+      h.sim.precisionNeverClean = true;
       await tester.tap(find.byKey(const ValueKey('zero-diff')));
-      await tester.pump(const Duration(milliseconds: 300));
-      await tester.tap(find.text('Zero anyway'));
-      await h.pump(tester, const Duration(milliseconds: 300));
-      expect(h.container.read(tareProvider), isNotNull);
+      await h.pump(tester, const Duration(seconds: 7));
+      expect(find.textContaining('No quiet 2 s window'), findsOneWidget);
+      expect(h.container.read(tareProvider), isNull);
       await h.dispose(tester);
     });
 

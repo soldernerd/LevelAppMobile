@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:inclinometer/devices/leveltronic/api_catalog.dart';
 import 'package:inclinometer/devices/leveltronic/protocol.dart';
 import 'package:inclinometer/ble/device_link.dart';
 import 'package:inclinometer/devices/leveltronic/precision_run.dart';
 import 'package:inclinometer/devices/leveltronic/calibration/calibration_math.dart';
+import 'package:inclinometer/devices/leveltronic/providers/info_provider.dart';
 import 'package:inclinometer/devices/leveltronic/providers/leveltronic_provider.dart';
 import 'package:inclinometer/devices/leveltronic/providers/flip_cal_provider.dart' show SensorMask;
 
@@ -36,8 +38,8 @@ class GainCalState {
   const GainCalState({
     this.stage = GainStage.setup,
     this.mask = SensorMask.both,
-    this.shimHeightMm = 0.100,
-    this.baselineMm = 1000.0,
+    this.shimHeightMm = const [0.100, 0.100],
+    this.baselineMm = const [150.0, 150.0],
     this.progress = 0,
     this.disturbed = false,
     this.currentK,
@@ -54,10 +56,10 @@ class GainCalState {
   final GainStage stage;
   final int mask;
 
-  /// The known tilt step: a shim of this height (mm) under one end of a
-  /// baseline of this length (mm).
-  final double shimHeightMm;
-  final double baselineMm;
+  /// Per-sensor shim setup: [S1, S2]. A shim of shimHeightMm[i] mm under one
+  /// end of a baseline of baselineMm[i] mm gives the known tilt for sensor i.
+  final List<double> shimHeightMm;
+  final List<double> baselineMm;
 
   /// 0..1 of the running precision measurement.
   final double progress;
@@ -79,13 +81,14 @@ class GainCalState {
   final String? message;
   final bool needsService;
 
-  double get knownTilt => shimTilt(shimHeightMm, baselineMm);
+  List<double> get knownTilts =>
+      [for (var i = 0; i < 2; i++) shimTilt(shimHeightMm[i], baselineMm[i])];
 
   GainCalState copyWith({
     GainStage? stage,
     int? mask,
-    double? shimHeightMm,
-    double? baselineMm,
+    List<double>? shimHeightMm,
+    List<double>? baselineMm,
     double? progress,
     bool? disturbed,
     List<int>? currentK,
@@ -127,6 +130,10 @@ class GainCalNotifier extends Notifier<GainCalState> {
   PrecisionRun? _run;
   StreamSubscription<ApiPrecisionStatus>? _sub;
   int _gen = 0;
+  String? _serial;
+
+  static String _keyHeight(String s, int i) => 'gain_cal_shim_height_${s}_$i';
+  static String _keyBaseline(String s, int i) => 'gain_cal_baseline_${s}_$i';
 
   @override
   GainCalState build() {
@@ -136,8 +143,30 @@ class GainCalNotifier extends Notifier<GainCalState> {
       _run = null;
       if (r != null) unawaited(r.cancel());
     });
+    final serial = ref.watch(identityProvider).asData?.value.serial;
+    _serial = serial;
+    if (serial != null) _loadShim(serial);
     Future(refreshValues);
     return const GainCalState();
+  }
+
+  Future<void> _loadShim(String serial) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final h = List<double>.from(state.shimHeightMm);
+      final b = List<double>.from(state.baselineMm);
+      var changed = false;
+      for (var i = 0; i < 2; i++) {
+        final hv = prefs.getDouble(_keyHeight(serial, i));
+        final bv = prefs.getDouble(_keyBaseline(serial, i));
+        if (hv != null) { h[i] = hv; changed = true; }
+        if (bv != null) { b[i] = bv; changed = true; }
+      }
+      if (!ref.mounted || _serial != serial) return;
+      if (changed) {
+        state = state.copyWith(shimHeightMm: h, baselineMm: b, keepStatus: true);
+      }
+    } catch (_) {}
   }
 
   Future<List<int>> _readK() async {
@@ -158,14 +187,35 @@ class GainCalNotifier extends Notifier<GainCalState> {
     state = state.copyWith(mask: mask);
   }
 
-  void setShim({double? heightMm, double? baselineMm}) {
+  void setShimForSensor(int sensor, {double? heightMm, double? baselineMm}) {
     if (state.stage != GainStage.setup) return;
-    state = state.copyWith(shimHeightMm: heightMm, baselineMm: baselineMm);
+    final h = List<double>.from(state.shimHeightMm);
+    final b = List<double>.from(state.baselineMm);
+    if (heightMm != null) h[sensor] = heightMm;
+    if (baselineMm != null) b[sensor] = baselineMm;
+    state = state.copyWith(shimHeightMm: h, baselineMm: b);
+    _saveShim();
+  }
+
+  Future<void> _saveShim() async {
+    final serial = _serial;
+    if (serial == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (var i = 0; i < 2; i++) {
+        await prefs.setDouble(_keyHeight(serial, i), state.shimHeightMm[i]);
+        await prefs.setDouble(_keyBaseline(serial, i), state.baselineMm[i]);
+      }
+    } catch (_) {}
   }
 
   /// Leave the setup and go to "measure the baseline".
   void begin() {
-    if (state.stage != GainStage.setup || state.knownTilt <= 0) return;
+    if (state.stage != GainStage.setup) return;
+    final tilts = state.knownTilts;
+    for (var i = 0; i < 2; i++) {
+      if (SensorMask.has(state.mask, i) && tilts[i] <= 0) return;
+    }
     state = state.copyWith(stage: GainStage.baseline);
   }
 
@@ -194,7 +244,7 @@ class GainCalNotifier extends Notifier<GainCalState> {
           kOldMicro: k[i],
           baseline: base[i],
           tilted: tilted[i],
-          trueTilt: state.knownTilt,
+          trueTilt: state.knownTilts[i],
         ),
     ];
     state = state.copyWith(

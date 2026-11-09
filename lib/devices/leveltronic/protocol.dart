@@ -325,7 +325,7 @@ class ApiLive {
   }
 }
 
-/// Topics SIGNAL_DIAG (56 bytes). Channel order is S2, B, A, S1.
+/// Topics SIGNAL_DIAG (56 bytes). Channel order is A, B, S1, S2.
 class ApiSignalDiag {
   const ApiSignalDiag({
     required this.rmsMv,
@@ -340,7 +340,7 @@ class ApiSignalDiag {
   final List<double> phaseDeg; // 4
   final double theoreticalTiltS1, theoreticalTiltS2;
 
-  static const channelNames = ['S2', 'B', 'A', 'S1'];
+  static const channelNames = ['A', 'B', 'S1', 'S2'];
 
   static ApiSignalDiag? decode(Uint8List d) {
     if (d.length < 56) return null;

@@ -341,7 +341,8 @@ void main() {
         GainCalState Function() state,
         {double step = 0.1}) {
       final n = h.container.read(gainCalProvider.notifier);
-      n.setShim(heightMm: 0.1, baselineMm: 1000);
+      n.setShimForSensor(0, heightMm: 0.1, baselineMm: 1000);
+      n.setShimForSensor(1, heightMm: 0.1, baselineMm: 1000);
       n.begin();
       h.sim.physicalTilt = [0.0, 0.0];
       n.measureBaseline();
@@ -391,8 +392,9 @@ void main() {
         final state = hold(h.container, gainCalProvider);
         pass(async, const Duration(milliseconds: 200));
         final n = h.container.read(gainCalProvider.notifier);
-        n.setShim(heightMm: 0.05, baselineMm: 250); // 0.2 mm/m
-        expect(state().knownTilt, closeTo(0.2, 1e-9));
+        n.setShimForSensor(0, heightMm: 0.05, baselineMm: 250); // 0.2 mm/m
+        n.setShimForSensor(1, heightMm: 0.05, baselineMm: 250);
+        expect(state().knownTilts[0], closeTo(0.2, 1e-9));
         n.begin();
         h.sim.physicalTilt = [0.0, 0.0];
         n.measureBaseline();
@@ -453,7 +455,8 @@ void main() {
         final h = SimHarness()..connect(async);
         final state = hold(h.container, gainCalProvider);
         final n = h.container.read(gainCalProvider.notifier);
-        n.setShim(heightMm: 0, baselineMm: 1000);
+        n.setShimForSensor(0, heightMm: 0, baselineMm: 1000);
+        n.setShimForSensor(1, heightMm: 0, baselineMm: 1000);
         n.begin();
         expect(state().stage, equals(GainStage.setup));
       });

@@ -6,7 +6,7 @@ import 'package:inclinometer/devices/leveltronic/providers/diagnostics_provider.
 import 'package:inclinometer/devices/leveltronic/ui/widgets/format.dart';
 
 /// Signal diagnostics: RMS, peak-to-peak and phase of the four ADC channels
-/// (S2, B, A, S1) at the converter pins, and the tilt each sensor channel's
+/// (A, B, S1, S2) at the converter pins, and the tilt each sensor channel's
 /// amplitude would correspond to by the Wyler handbook figure. For setting up
 /// and troubleshooting, not for measuring.
 class DiagnosticsScreen extends ConsumerWidget {
@@ -43,7 +43,9 @@ class DiagnosticsScreen extends ConsumerWidget {
               const Text(
                 'Channels in ADC order. A and B are the excitation '
                 'references (A is the phase reference, 0°); S1 and S2 are the '
-                'sensor signals.',
+                'sensor signals. Each exciter channel shows half the '
+                'differential drive amplitude — the actual drive to the sensor '
+                'is A − B = 2 × A.',
                 style: TextStyle(color: Colors.white60, height: 1.4),
               ),
               const SizedBox(height: 12),

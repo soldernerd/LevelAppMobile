@@ -160,6 +160,11 @@ class ScanScreen extends ConsumerWidget {
           if (permanentlyDenied) _buildPermissionDeniedBanner(),
           if (!open.isEmpty) _buildOpenDevices(context, ref, open),
           Expanded(child: _buildBody(context, ref, status, devices)),
+          _DemoTile(
+            onTap: () => ref
+                .read(connectionNotifierProvider.notifier)
+                .connectDemo(),
+          ),
           if (version.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -287,6 +292,37 @@ class ScanScreen extends ConsumerWidget {
           },
         );
       },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Demo tile
+// ---------------------------------------------------------------------------
+
+class _DemoTile extends StatelessWidget {
+  const _DemoTile({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(Icons.science_outlined, size: 16, color: Colors.white38),
+            SizedBox(width: 6),
+            Text(
+              'Open demo instrument',
+              style: TextStyle(fontSize: 13, color: Colors.white38),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

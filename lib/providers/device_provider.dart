@@ -250,6 +250,34 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
     }
   }
 
+  /// Connects to a local simulated instrument (demo mode). Creates a
+  /// [MockBleManager.demo] for the duration of the session and disposes it
+  /// when the connection closes.
+  Future<void> connectDemo() async {
+    ref.read(connectionErrorProvider.notifier).state = null;
+    const demoId = 'DEMO:00:00:00:00:00';
+    final sessions = ref.read(sessionsProvider.notifier);
+    if (ref.read(sessionsProvider).contains(demoId)) {
+      sessions.activate(demoId);
+      state = ConnectionStatus.connected;
+      return;
+    }
+    try {
+      state = ConnectionStatus.connecting;
+      final mgr = MockBleManager.demo();
+      final connection = await mgr.open(demoId);
+      final session =
+          await ref.read(deviceRegistryProvider).openSession(connection);
+      unawaited(connection.closed.then<void>((_) => mgr.dispose()));
+      sessions.add(session);
+      state = ConnectionStatus.connected;
+    } catch (e) {
+      ref.read(connectionErrorProvider.notifier).state =
+          'Could not start demo.';
+      state = ConnectionStatus.error;
+    }
+  }
+
   /// Debug-only: simulates an involuntary disconnect via [MockBleManager].
   /// Encapsulates the `is MockBleManager` check so `lib/ui/` never imports
   /// the mock. No-op on the real manager.

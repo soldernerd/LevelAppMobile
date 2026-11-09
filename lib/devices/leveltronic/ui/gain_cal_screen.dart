@@ -29,21 +29,26 @@ class GainCalScreen extends ConsumerStatefulWidget {
 class _GainCalScreenState extends ConsumerState<GainCalScreen> {
   static const _title = 'Gain calibration';
 
-  late final TextEditingController _height;
-  late final TextEditingController _length;
+  late final List<TextEditingController> _heights;
+  late final List<TextEditingController> _lengths;
 
   @override
   void initState() {
     super.initState();
     final s = ref.read(gainCalProvider);
-    _height = TextEditingController(text: _num(s.shimHeightMm));
-    _length = TextEditingController(text: _num(s.baselineMm));
+    _heights = [
+      TextEditingController(text: _num(s.shimHeightMm[0])),
+      TextEditingController(text: _num(s.shimHeightMm[1])),
+    ];
+    _lengths = [
+      TextEditingController(text: _num(s.baselineMm[0])),
+      TextEditingController(text: _num(s.baselineMm[1])),
+    ];
   }
 
   @override
   void dispose() {
-    _height.dispose();
-    _length.dispose();
+    for (final c in [..._heights, ..._lengths]) { c.dispose(); }
     super.dispose();
   }
 
@@ -52,10 +57,11 @@ class _GainCalScreenState extends ConsumerState<GainCalScreen> {
 
   double? _parse(String t) => double.tryParse(t.trim().replaceAll(',', '.'));
 
-  void _onInput() {
-    ref.read(gainCalProvider.notifier).setShim(
-          heightMm: _parse(_height.text) ?? 0,
-          baselineMm: _parse(_length.text) ?? 0,
+  void _onInputFor(int sensor) {
+    ref.read(gainCalProvider.notifier).setShimForSensor(
+          sensor,
+          heightMm: _parse(_heights[sensor].text) ?? 0,
+          baselineMm: _parse(_lengths[sensor].text) ?? 0,
         );
   }
 
@@ -66,9 +72,24 @@ class _GainCalScreenState extends ConsumerState<GainCalScreen> {
     final n = ref.read(gainCalProvider.notifier);
     final service = ref.watch(serviceModeProvider);
 
+    // Sync controllers when shim settings load from SharedPreferences.
+    ref.listen<GainCalState>(gainCalProvider, (prev, next) {
+      if (next.stage != GainStage.setup) return;
+      for (var i = 0; i < 2; i++) {
+        if (prev?.shimHeightMm[i] != next.shimHeightMm[i]) {
+          _heights[i].text = _num(next.shimHeightMm[i]);
+        }
+        if (prev?.baselineMm[i] != next.baselineMm[i]) {
+          _lengths[i].text = _num(next.baselineMm[i]);
+        }
+      }
+    });
+
     switch (s.stage) {
       case GainStage.setup:
-        final tilt = s.knownTilt;
+        final tilts = s.knownTilts;
+        final tiltOk = [0, 1].every(
+            (i) => !SensorMask.has(s.mask, i) || tilts[i] > 0);
         return WizardScaffold(
           title: _title,
           children: [
@@ -86,47 +107,28 @@ class _GainCalScreenState extends ConsumerState<GainCalScreen> {
             const SizedBox(height: 6),
             SensorSelector(mask: s.mask, onChanged: n.selectSensors),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    key: const ValueKey('gain-height'),
-                    controller: _height,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                    ],
-                    decoration: const InputDecoration(
-                        labelText: 'Shim height', suffixText: 'mm'),
-                    onChanged: (_) => _onInput(),
-                  ),
+            for (var i = 0; i < 2; i++)
+              if (SensorMask.has(s.mask, i)) ...[
+                _ShimRow(
+                  sensor: i,
+                  heightCtrl: _heights[i],
+                  lengthCtrl: _lengths[i],
+                  onChanged: () => _onInputFor(i),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    key: const ValueKey('gain-length'),
-                    controller: _length,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                    ],
-                    decoration: const InputDecoration(
-                        labelText: 'Edge length', suffixText: 'mm'),
-                    onChanged: (_) => _onInput(),
-                  ),
-                ),
+                const SizedBox(height: 8),
               ],
-            ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 2),
             Text(
-              tilt > 0
-                  ? 'Known tilt step: ${tilt.toStringAsFixed(4)} mm/m'
-                  : 'Enter a shim height and an edge length.',
+              tiltOk
+                  ? [
+                      for (var i = 0; i < 2; i++)
+                        if (SensorMask.has(s.mask, i))
+                          'S${i + 1}: ${tilts[i].toStringAsFixed(4)} mm/m',
+                    ].join('   ·   ')
+                  : 'Enter shim height and edge length for each sensor.',
               key: const ValueKey('gain-known-tilt'),
               style: const TextStyle(
-                  fontSize: 16,
+                  fontSize: 15,
                   fontWeight: FontWeight.w600,
                   color: Colors.white),
             ),
@@ -138,7 +140,7 @@ class _GainCalScreenState extends ConsumerState<GainCalScreen> {
           actions: [
             FilledButton(
               key: const ValueKey('gain-begin'),
-              onPressed: tilt > 0 ? n.begin : null,
+              onPressed: (tiltOk && service) ? n.begin : null,
               style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(52)),
               child: const Text('Start'),
@@ -194,7 +196,9 @@ class _GainCalScreenState extends ConsumerState<GainCalScreen> {
             const SizedBox(height: 16),
             InstrumentDiagram(
               pose: baseline ? DiagramPose.level : DiagramPose.shim,
-              label: baseline ? null : '${_num(s.shimHeightMm)} mm',
+              label: baseline
+                  ? null
+                  : '${_num(s.shimHeightMm[SensorMask.has(s.mask, 0) ? 0 : 1])} mm',
             ),
             const SizedBox(height: 16),
             ProgressPanel(
@@ -219,11 +223,16 @@ class _GainCalScreenState extends ConsumerState<GainCalScreen> {
             const StepHeader(step: 2, total: 3, title: 'With the shim'),
             const SizedBox(height: 16),
             InstrumentDiagram(
-                pose: DiagramPose.shim, label: '${_num(s.shimHeightMm)} mm'),
+              pose: DiagramPose.shim,
+              label:
+                  '${_num(s.shimHeightMm[SensorMask.has(s.mask, 0) ? 0 : 1])} mm',
+            ),
             const SizedBox(height: 8),
             Instructions([
-              'Put the ${_num(s.shimHeightMm)} mm shim under one end of the '
-                  '${_num(s.baselineMm)} mm edge.',
+              for (var i = 0; i < 2; i++)
+                if (SensorMask.has(s.mask, i))
+                  'S${i + 1}: put the ${_num(s.shimHeightMm[i])} mm shim '
+                      'under one end of the ${_num(s.baselineMm[i])} mm edge.',
               'Let it settle, keep it still, then measure.',
             ]),
             if (s.message != null) ...[
@@ -332,8 +341,7 @@ class _GainCalScreenState extends ConsumerState<GainCalScreen> {
               const SizedBox(height: 12),
               BeforeAfterTable(
                 key: const ValueKey('gain-verify'),
-                title: 'Check: the shim now reads (known '
-                    '${s.knownTilt.toStringAsFixed(4)} mm/m)',
+                title: 'Check: the shim now reads',
                 rows: [
                   for (var i = 0; i < 2; i++)
                     if (SensorMask.has(s.mask, i))
@@ -343,7 +351,7 @@ class _GainCalScreenState extends ConsumerState<GainCalScreen> {
                             decimals: 4),
                         after: fmtSigned(s.verifyReading![i], decimals: 4),
                         delta: fmtSigned(
-                            (s.verifyReading![i].abs() / s.knownTilt - 1) * 100,
+                            (s.verifyReading![i].abs() / s.knownTilts[i] - 1) * 100,
                             decimals: 1,
                             unit: '%'),
                       ),
@@ -388,6 +396,68 @@ class _GainCalScreenState extends ConsumerState<GainCalScreen> {
           ],
         );
     }
+  }
+}
+
+class _ShimRow extends StatelessWidget {
+  const _ShimRow({
+    required this.sensor,
+    required this.heightCtrl,
+    required this.lengthCtrl,
+    required this.onChanged,
+  });
+
+  final int sensor;
+  final TextEditingController heightCtrl;
+  final TextEditingController lengthCtrl;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 28,
+          child: Text(
+            'S${sensor + 1}',
+            style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.white70),
+          ),
+        ),
+        Expanded(
+          child: TextField(
+            key: ValueKey('gain-height-$sensor'),
+            controller: heightCtrl,
+            keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+            ],
+            decoration: const InputDecoration(
+                labelText: 'Shim height', suffixText: 'mm'),
+            onChanged: (_) => onChanged(),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: TextField(
+            key: ValueKey('gain-length-$sensor'),
+            controller: lengthCtrl,
+            keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+            ],
+            decoration: const InputDecoration(
+                labelText: 'Edge length', suffixText: 'mm'),
+            onChanged: (_) => onChanged(),
+          ),
+        ),
+      ],
+    );
   }
 }
 

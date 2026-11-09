@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:inclinometer/devices/leveltronic/device_state.dart';
+import 'package:inclinometer/devices/leveltronic/instrument_api.dart';
+import 'package:inclinometer/devices/leveltronic/precision_run.dart';
+import 'package:inclinometer/devices/leveltronic/protocol.dart';
 import 'package:inclinometer/providers/device_provider.dart';
 import 'package:inclinometer/devices/leveltronic/providers/leveltronic_provider.dart';
 import 'package:inclinometer/ui/device_switcher.dart';
@@ -159,8 +162,8 @@ class InstrumentScreen extends ConsumerWidget {
                   Expanded(
                     child: OutlinedButton.icon(
                       key: const ValueKey('zero-diff'),
-                      onPressed: connected && hasReading && diff != null
-                          ? () => _zeroDiff(context, ref, d!)
+                      onPressed: connected
+                          ? () => _zeroDiff(context, ref)
                           : null,
                       onLongPress: tare != null
                           ? () => ref.read(tareProvider.notifier).clear()
@@ -203,30 +206,14 @@ class InstrumentScreen extends ConsumerWidget {
     ));
   }
 
-  Future<void> _zeroDiff(
-      BuildContext context, WidgetRef ref, DeviceState d) async {
-    final notifier = ref.read(tareProvider.notifier);
-    if (d.diffDoubtful) {
-      final go = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Reading is disturbed'),
-          content: const Text(
-              'The table is not quiet. Zeroing now would bake the disturbance '
-              'in. Zero anyway?'),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel')),
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Zero anyway')),
-          ],
-        ),
-      );
-      if (go != true) return;
-    }
-    await notifier.set(d.tiltDiff!);
+  Future<void> _zeroDiff(BuildContext context, WidgetRef ref) async {
+    final api = ref.read(instrumentApiProvider);
+    final diff = await showDialog<double>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _PrecisionZeroDialog(api: api),
+    );
+    if (diff != null) await ref.read(tareProvider.notifier).set(diff);
   }
 
   void _onMenu(BuildContext context, WidgetRef ref, String value) {
@@ -331,6 +318,112 @@ class _ReadingCard extends StatelessWidget {
           VibrationIndicator(disturbed: disturbed, hasReading: hasReading),
         ],
       ),
+    );
+  }
+}
+
+/// A dialog that runs a precision measurement and returns its `tiltDiff` on
+/// close, or null if the user cancelled or the measurement failed.
+class _PrecisionZeroDialog extends StatefulWidget {
+  const _PrecisionZeroDialog({required this.api});
+
+  final InstrumentApi api;
+
+  @override
+  State<_PrecisionZeroDialog> createState() => _PrecisionZeroDialogState();
+}
+
+class _PrecisionZeroDialogState extends State<_PrecisionZeroDialog> {
+  PrecisionRun? _run;
+  double _progress = 0;
+  bool _disturbed = false;
+  bool _failed = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _start();
+  }
+
+  Future<void> _start() async {
+    final run = PrecisionRun(widget.api);
+    _run = run;
+    run.updates.listen((s) {
+      if (!mounted || s.phase != PrecisionPhase.running) return;
+      setState(() {
+        _progress = s.target == 0 ? 0 : s.count / s.target;
+        _disturbed = s.disturbed;
+      });
+    });
+    try {
+      final result = await run.start();
+      if (!mounted) return;
+      if (result.failed) {
+        setState(() => _failed = true);
+      } else {
+        Navigator.of(context).pop(result.tiltDiff);
+      }
+    } on PrecisionCancelled {
+      // cancelled via the button — dialog already closing
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Could not complete the measurement.');
+    }
+  }
+
+  Future<void> _cancel() async {
+    await _run?.cancel();
+    if (mounted) Navigator.of(context).pop(null);
+  }
+
+  @override
+  void dispose() {
+    _run?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_failed || _error != null) {
+      return AlertDialog(
+        title: const Text('Zero Diff'),
+        content: Text(
+          _error ??
+              'No quiet 2 s window within 5 s. '
+              'Keep the table still and try again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(null),
+            child: const Text('Close'),
+          ),
+        ],
+      );
+    }
+
+    return AlertDialog(
+      title: const Text('Zero Diff'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Taking a precision measurement…'),
+          const SizedBox(height: 16),
+          LinearProgressIndicator(
+              value: _progress == 0 ? null : _progress),
+          if (_disturbed) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'Table disturbed — waiting for a quiet window',
+              style:
+                  TextStyle(fontSize: 12, color: Color(0xFFFFA000)),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: _cancel, child: const Text('Cancel')),
+      ],
     );
   }
 }

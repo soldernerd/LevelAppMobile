@@ -57,7 +57,7 @@ class PhaseCalScreen extends ConsumerWidget {
           actions: [
             FilledButton(
               key: const ValueKey('phase-begin'),
-              onPressed: n.begin,
+              onPressed: service ? n.begin : null,
               style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(52)),
               child: const Text('Start'),
@@ -332,8 +332,9 @@ class _EstimateCard extends StatelessWidget {
       verdict = 'No usable step was seen. Use a larger shim and redo the tilt.';
     } else if (!e.inRange) {
       color = const Color(0xFFE53935);
-      verdict = 'The phase is outside ±45°, which the instrument cannot '
-          'store. Check the cabling / sensor before calibrating.';
+      verdict = 'The phase is outside ±45°. This is the firmware\'s storage '
+          'limit — it cannot be changed in the app. Check sensor cabling '
+          'and orientation.';
     } else if (!e.confident) {
       color = const Color(0xFFFFA000);
       verdict = 'Low confidence — a larger step or a quieter table would '

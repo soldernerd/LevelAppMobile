@@ -11,8 +11,15 @@ final signalDiagProvider = StreamProvider.autoDispose<ApiSignalDiag>((ref) {
 });
 
 /// The ADC PGA gain of S1 and S2 (index 0 = S1, 1 = S2), read once per visit;
-/// null where the firmware (before 0.11.8) does not have the resource.
+/// null where it cannot be read.
 final sensorPgaProvider = FutureProvider.autoDispose<List<int?>>((ref) async {
   final api = ref.watch(instrumentApiProvider);
   return [for (final d in kChannelPga) await api.tryReadValue(d)];
+});
+
+/// The stored signal phases of S1 and S2 in 0.01°, to turn the measured phase
+/// into the calibrated one.
+final sensorPhaseProvider = FutureProvider.autoDispose<List<int?>>((ref) async {
+  final api = ref.watch(instrumentApiProvider);
+  return [for (final d in kSensorPhase) await api.tryReadValue(d)];
 });

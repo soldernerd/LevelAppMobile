@@ -114,16 +114,6 @@ void main() {
       expect(find.text('300 s'), findsOneWidget);
       expect(find.text('Charge start voltage'), findsOneWidget);
       expect(find.text('3700 mV'), findsOneWidget);
-      // Not in this firmware: hidden, not shown as a dash.
-      expect(find.text('Max time at 100 %'), findsNothing);
-      await h.dispose(tester);
-    });
-
-    testWidgets('shows max-time-at-100 % when the firmware has it',
-        (tester) async {
-      final h = await AppHarness.start(tester,
-          device: SimulatedDevice(supportsChargeFullTimeout: true),
-          location: loc);
       expect(find.text('Max time at 100 %'), findsOneWidget);
       expect(find.text('120 min'), findsOneWidget);
       await h.dispose(tester);

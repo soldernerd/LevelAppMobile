@@ -64,13 +64,16 @@ API v3 only — the Leveltronic driver refuses anything else
   simulator's known truth):
   - *Flip (zero)*: Commands ZERO_CAL step 1 → user turns 180° → step 2 →
     firmware stores the zero; the app shows zero before/after.
-  - *Phase*: capture the phasor stream flat and with a tilt step; with
-    `u = S/(A−B)` the direction of Δu is the sensor's signal phase (folded to
-    ±90°, must be within ±180°). Independent of the stored phase and of the
-    step size.
+  - *Phase*: capture the phasor stream (wire order S2, B, A, S1 since fw
+    0.13.0) with a clear positive and a clear negative tilt (or one of them,
+    user's choice); with `u = S/(A−B)` a positive tilt points at the sensor's
+    signal phase φ, a negative one at φ+180°. Both: direction of `u₊ − u₋`
+    (zero offset cancels); one: direction of `u` (turned 180° for negative).
+    Full ±180°; an inverted sensor (INVERT=1) gets φ+180°. Independent of the
+    stored phase and of the tilt size.
   - *Gain (k)*: two precision measurements (baseline, known shim);
-    `kNew = kOld·|Δreading| / tilt`, tilt = shim ÷ edge × 1000 mm/m; then
-    re-measures to prove it. Recommended order: phase → gain → zero.
+    `kNew = kOld·|Δreading| / tilt`, tilt = shim ÷ edge × 1000 mm/m; saving only
+    stores k (no further measurement). Recommended order: phase → gain → zero.
 - **Settings** page is data-driven from `lib/ble/api_catalog.dart`. Settings
   0x53 (max minutes at 100 %) is *optional*: it is reserved for the
   drift-probe branch and is hidden unless a GET answers.

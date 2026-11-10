@@ -10,8 +10,12 @@ enum DiagramPose {
   /// The same, turned by 180° (the mark now faces away).
   rotated,
 
-  /// The plate raised at one end by a shim of known height.
+  /// The plate raised at the back end (the end without the red mark) by a
+  /// shim of known height: the front is low, which reads negative.
   shim,
+
+  /// The plate raised at the front end (the red mark): reads positive.
+  shimFront,
 }
 
 /// A schematic of the instrument on a plate, animated between poses. Used by
@@ -34,7 +38,11 @@ class InstrumentDiagram extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rotation = pose == DiagramPose.rotated ? pi : 0.0;
-    final plateTilt = pose == DiagramPose.shim ? -0.09 : 0.0;
+    final plateTilt = switch (pose) {
+      DiagramPose.shim => -0.09,
+      DiagramPose.shimFront => 0.09,
+      _ => 0.0,
+    };
     return SizedBox(
       height: height,
       width: double.infinity,
@@ -51,7 +59,9 @@ class InstrumentDiagram extends StatelessWidget {
             painter: _DiagramPainter(
               rotation: rot,
               plateTilt: tilt,
-              showShim: pose == DiagramPose.shim,
+              showShim:
+                  pose == DiagramPose.shim || pose == DiagramPose.shimFront,
+              raiseFront: pose == DiagramPose.shimFront,
               shimLabel: label,
               showTurnArrow: pose == DiagramPose.rotated,
             ),
@@ -67,6 +77,7 @@ class _DiagramPainter extends CustomPainter {
     required this.rotation,
     required this.plateTilt,
     required this.showShim,
+    required this.raiseFront,
     required this.shimLabel,
     required this.showTurnArrow,
   });
@@ -74,6 +85,7 @@ class _DiagramPainter extends CustomPainter {
   final double rotation;
   final double plateTilt;
   final bool showShim;
+  final bool raiseFront;
   final String? shimLabel;
   final bool showTurnArrow;
 
@@ -94,7 +106,8 @@ class _DiagramPainter extends CustomPainter {
 
     // Shim block under the right end of the plate.
     if (showShim) {
-      final shim = Rect.fromLTWH(cx + plateW / 2 - 34, base + 8, 26, 14);
+      final shimX = raiseFront ? cx - plateW / 2 + 8 : cx + plateW / 2 - 34;
+      final shim = Rect.fromLTWH(shimX, base + 8, 26, 14);
       canvas.drawRRect(
         RRect.fromRectAndRadius(shim, const Radius.circular(2)),
         Paint()..color = const Color(0xFFFFB300),
@@ -113,8 +126,9 @@ class _DiagramPainter extends CustomPainter {
 
     // Plate (pivots on its left end when shimmed).
     canvas.save();
-    canvas.translate(cx - plateW / 2, base + 8);
+    canvas.translate(raiseFront ? cx + plateW / 2 : cx - plateW / 2, base + 8);
     canvas.rotate(plateTilt);
+    if (raiseFront) canvas.translate(-plateW, 0);
     final plate = RRect.fromRectAndRadius(
       Rect.fromLTWH(0, -8, plateW, 8),
       const Radius.circular(2),
@@ -187,6 +201,7 @@ class _DiagramPainter extends CustomPainter {
       old.rotation != rotation ||
       old.plateTilt != plateTilt ||
       old.showShim != showShim ||
+      old.raiseFront != raiseFront ||
       old.shimLabel != shimLabel ||
       old.showTurnArrow != showTurnArrow;
 }

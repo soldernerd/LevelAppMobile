@@ -58,7 +58,6 @@ class ApiValueDef {
     required this.max,
     this.unit = '',
     this.service = false,
-    this.optional = false,
     this.group = '',
   });
 
@@ -76,9 +75,6 @@ class ApiValueDef {
   /// Writes need service mode.
   final bool service;
 
-  /// Not present in every firmware build; a GET answering UNKNOWN_RESOURCE
-  /// simply hides the row.
-  final bool optional;
   final String group;
 
   int get getOpcode => opGet(category, id);
@@ -126,7 +122,6 @@ const List<ApiValueDef> kSettings = [
     min: 0,
     max: 65535,
     unit: 'min',
-    optional: true,
     group: 'Power',
   ),
   ApiValueDef(
@@ -325,12 +320,11 @@ const ApiValueDef kS1Pga = ApiValueDef(
   label: 'S1 PGA gain',
   description:
       'ADC programmable gain of sensor 1, a power of two (1, 2, 4 … 128); '
-      'applied immediately, k stays stated for PGA 1. Firmware 0.11.8+.',
+      'applied immediately, k stays stated for PGA 1.',
   type: ValType.u8,
   min: 1,
   max: 128,
   service: true,
-  optional: true,
   group: 'Sensor 1',
 );
 const ApiValueDef kS2Pga = ApiValueDef(
@@ -339,12 +333,11 @@ const ApiValueDef kS2Pga = ApiValueDef(
   label: 'S2 PGA gain',
   description:
       'ADC programmable gain of sensor 2, a power of two (1, 2, 4 … 128); '
-      'applied immediately, k stays stated for PGA 1. Firmware 0.11.8+.',
+      'applied immediately, k stays stated for PGA 1.',
   type: ValType.u8,
   min: 1,
   max: 128,
   service: true,
-  optional: true,
   group: 'Sensor 2',
 );
 const ApiValueDef kAPga = ApiValueDef(
@@ -354,12 +347,11 @@ const ApiValueDef kAPga = ApiValueDef(
   description:
       'ADC programmable gain of excitation A (ADC ch2), a power of two; '
       'applied immediately. The input range is ±1.2 V / PGA and A is already '
-      'about 0.6 V peak at PGA 1: a higher gain clips. Firmware 0.12.0+.',
+      'about 0.6 V peak at PGA 1: a higher gain clips.',
   type: ValType.u8,
   min: 1,
   max: 128,
   service: true,
-  optional: true,
   group: 'Excitation',
 );
 const ApiValueDef kBPga = ApiValueDef(
@@ -368,12 +360,11 @@ const ApiValueDef kBPga = ApiValueDef(
   label: 'B PGA gain',
   description:
       'ADC programmable gain of excitation B (ADC ch1), a power of two; same '
-      'remark as A. Firmware 0.12.0+.',
+      'remark as A.',
   type: ValType.u8,
   min: 1,
   max: 128,
   service: true,
-  optional: true,
   group: 'Excitation',
 );
 

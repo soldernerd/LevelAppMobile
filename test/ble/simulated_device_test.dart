@@ -107,24 +107,6 @@ void main() {
       });
     });
 
-    test('the optional charge timeout exists only when supported', () {
-      fakeAsync((async) {
-        final charge = kSettings.firstWhere((d) => d.id == 0x53);
-        expect(
-          settle(async,
-              InstrumentApi(SimulatedDevice()).tryReadValue(charge)),
-          isNull,
-        );
-        expect(
-          settle(
-              async,
-              InstrumentApi(SimulatedDevice(supportsChargeFullTimeout: true))
-                  .tryReadValue(charge)),
-          equals(120),
-        );
-      });
-    });
-
     test('service mode ends by itself after 10 minutes of silence', () {
       fakeAsync((async) {
         final sim = SimulatedDevice()..setServiceMode(true);

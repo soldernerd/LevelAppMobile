@@ -179,19 +179,15 @@ class _GainCalScreenState extends ConsumerState<GainCalScreen> {
 
       case GainStage.measuringBaseline:
       case GainStage.measuringShim:
-      case GainStage.verifying:
         final baseline = s.stage == GainStage.measuringBaseline;
-        final verifying = s.stage == GainStage.verifying;
         return WizardScaffold(
           title: _title,
           canPop: false,
           children: [
             StepHeader(
-              step: baseline ? 1 : (verifying ? 3 : 2),
+              step: baseline ? 1 : 2,
               total: 3,
-              title: baseline
-                  ? 'Baseline'
-                  : (verifying ? 'Checking the new k' : 'With the shim'),
+              title: baseline ? 'Baseline' : 'With the shim',
             ),
             const SizedBox(height: 16),
             InstrumentDiagram(
@@ -337,32 +333,6 @@ class _GainCalScreenState extends ConsumerState<GainCalScreen> {
                     ),
               ],
             ),
-            if (s.verifyReading != null) ...[
-              const SizedBox(height: 12),
-              BeforeAfterTable(
-                key: const ValueKey('gain-verify'),
-                title: 'Check: the shim now reads',
-                rows: [
-                  for (var i = 0; i < 2; i++)
-                    if (SensorMask.has(s.mask, i))
-                      BeforeAfterRow(
-                        label: 'S${i + 1}',
-                        before: fmtSigned(s.shimReading![i] - s.baselineReading![i],
-                            decimals: 4),
-                        after: fmtSigned(s.verifyReading![i], decimals: 4),
-                        delta: fmtSigned(
-                            (s.verifyReading![i].abs() / s.knownTilts[i] - 1) * 100,
-                            decimals: 1,
-                            unit: '%'),
-                      ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              const Text('"Before" is the step as read with the old k, '
-                  '"After" with the new k; "Change" is the new reading\'s '
-                  'deviation from the known tilt.',
-                  style: TextStyle(fontSize: 12, color: Colors.white54)),
-            ],
             const SizedBox(height: 16),
             const Text(
               'Last in the usual order: the zero (flip) calibration.',

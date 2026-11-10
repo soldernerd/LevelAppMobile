@@ -173,7 +173,17 @@ void main() {
   group('phase calibration screen', () {
     const loc = '/leveltronic/calibration/phase';
 
-    testWidgets('leads through reference, tilt step and result',
+    /// Captures one tilt: taps the capture button and waits it out.
+    Future<void> captureTilt(
+        WidgetTester tester, AppHarness h, double tilt) async {
+      h.sim.physicalTilt = [tilt, tilt];
+      await tester.tap(find.byKey(const ValueKey('phase-capture')));
+      await h.pump(tester, const Duration(seconds: 2));
+      expect(find.byKey(const ValueKey('phase-progress')), findsOneWidget);
+      await h.pump(tester, const Duration(seconds: 8));
+    }
+
+    testWidgets('leads through a positive tilt, a negative tilt and the result',
         (tester) async {
       final h = await AppHarness.start(tester, location: loc);
       expect(find.text('Stored phase'), findsOneWidget);
@@ -182,19 +192,14 @@ void main() {
       await turnServiceOn(tester, h);
       await tester.tap(find.byKey(const ValueKey('phase-begin')));
       await h.pump(tester, const Duration(milliseconds: 400));
-      expect(find.text('Reference'), findsOneWidget);
-      h.sim.setServiceMode(false);  // turn off so apply is blocked until re-enabled below
+      expect(find.text('Positive tilt'), findsOneWidget);
+      expect(find.text('STEP 1 OF 2'), findsOneWidget);
+      h.sim.setServiceMode(false); // so apply is blocked until re-enabled below
 
-      h.sim.physicalTilt = [0.0, 0.0];
-      await tester.tap(find.byKey(const ValueKey('phase-capture-ref')));
-      await h.pump(tester, const Duration(seconds: 2));
-      expect(find.byKey(const ValueKey('phase-progress')), findsOneWidget);
-      await h.pump(tester, const Duration(seconds: 8));
-      expect(find.text('Tilt step'), findsOneWidget);
-
-      h.sim.physicalTilt = [0.15, 0.15];
-      await tester.tap(find.byKey(const ValueKey('phase-capture-tilt')));
-      await h.pump(tester, const Duration(seconds: 10));
+      await captureTilt(tester, h, 0.15);
+      expect(find.text('Negative tilt'), findsOneWidget);
+      expect(find.text('STEP 2 OF 2'), findsOneWidget);
+      await captureTilt(tester, h, -0.15);
 
       expect(find.text('Result'), findsOneWidget);
       expect(textOf(tester, find.byKey(const ValueKey('phase-angle-S1'))),
@@ -217,17 +222,34 @@ void main() {
       await h.dispose(tester);
     });
 
-    testWidgets('warns when there was no tilt step', (tester) async {
+    testWidgets('one tilt only: positive or negative', (tester) async {
+      final h = await AppHarness.start(tester, location: loc);
+      await turnServiceOn(tester, h);
+      await tester.tap(find.byKey(const ValueKey('phase-mode-neg')));
+      await h.pump(tester, const Duration(milliseconds: 300));
+      await tester.tap(find.byKey(const ValueKey('phase-begin')));
+      await h.pump(tester, const Duration(milliseconds: 400));
+      expect(find.text('Negative tilt'), findsOneWidget);
+      expect(find.text('STEP 1 OF 1'), findsOneWidget);
+      await captureTilt(tester, h, -0.15);
+      expect(find.text('Result'), findsOneWidget);
+      expect(textOf(tester, find.byKey(const ValueKey('phase-angle-S1'))),
+          startsWith('+12.0'));
+      expect(find.textContaining('one tilt only'), findsWidgets);
+      await tester.tap(find.byKey(const ValueKey('phase-apply')));
+      await h.pump(tester, const Duration(seconds: 1));
+      expect(h.sim.calibration(kS1Phase), closeTo(1200, 20));
+      await h.dispose(tester);
+    });
+
+    testWidgets('warns when there was no tilt', (tester) async {
       final h = await AppHarness.start(tester, location: loc);
       await turnServiceOn(tester, h);
       await tester.tap(find.byKey(const ValueKey('phase-begin')));
       await h.pump(tester, const Duration(milliseconds: 400));
-      h.sim.physicalTilt = [0.0, 0.0];
-      await tester.tap(find.byKey(const ValueKey('phase-capture-ref')));
-      await h.pump(tester, const Duration(seconds: 10));
-      await tester.tap(find.byKey(const ValueKey('phase-capture-tilt')));
-      await h.pump(tester, const Duration(seconds: 10));
-      expect(find.textContaining('No usable step'), findsWidgets);
+      await captureTilt(tester, h, 0.0);
+      await captureTilt(tester, h, 0.0);
+      expect(find.textContaining('No usable signal'), findsWidgets);
       await turnServiceOn(tester, h);
       expect(enabled(tester, 'phase-apply'), isFalse);
       await h.dispose(tester);
@@ -240,12 +262,8 @@ void main() {
       await turnServiceOn(tester, h);
       await tester.tap(find.byKey(const ValueKey('phase-begin')));
       await h.pump(tester, const Duration(milliseconds: 400));
-      h.sim.physicalTilt = [0.0, 0.0];
-      await tester.tap(find.byKey(const ValueKey('phase-capture-ref')));
-      await h.pump(tester, const Duration(seconds: 10));
-      h.sim.physicalTilt = [0.15, 0.15];
-      await tester.tap(find.byKey(const ValueKey('phase-capture-tilt')));
-      await h.pump(tester, const Duration(seconds: 10));
+      await captureTilt(tester, h, 0.15);
+      await captureTilt(tester, h, -0.15);
       expect(find.byKey(const ValueKey('phase-estimate-S2')), findsOneWidget);
       expect(find.byKey(const ValueKey('phase-estimate-S1')), findsNothing);
       await h.dispose(tester);
@@ -317,7 +335,6 @@ void main() {
       await h.pump(tester, const Duration(seconds: 6));
       expect(find.text('Sensitivity stored'), findsOneWidget);
       expect(find.byKey(const ValueKey('gain-result')), findsOneWidget);
-      expect(find.byKey(const ValueKey('gain-verify')), findsOneWidget);
       expect(h.sim.calibration(kS1K), closeTo(50000, 300));
       await h.dispose(tester);
     });

@@ -44,27 +44,33 @@ class ComplexStats {
   return ((sr * dr + si * di) / d, (si * dr - sr * di) / d);
 }
 
-/// The result of comparing two captures of `u`: a flat reference and a known
-/// tilt step.
+/// The signal phase of a sensor found from captures of `u = S / (A − B)`
+/// with a clear tilt applied.
 class PhaseEstimate {
   const PhaseEstimate({
     required this.angleDeg,
     required this.uncertaintyDeg,
     required this.snr,
     required this.stepMagnitude,
+    this.singleSided = false,
   });
 
-  /// The signal phase, folded to (−90°, 90°].
+  /// The signal phase in (−180°, 180°]: the direction of `u` for a positive
+  /// tilt.
   final double angleDeg;
 
   /// 1σ uncertainty of [angleDeg].
   final double uncertaintyDeg;
 
-  /// |Δu| over the standard error perpendicular to it.
+  /// |signal| over the standard error perpendicular to it.
   final double snr;
 
-  /// |Δu|, the size of the step in the ratio plane.
+  /// |u| (one tilt) or |u₊ − u₋| (both), the signal size in the ratio plane.
   final double stepMagnitude;
+
+  /// Found from one tilt direction only, so the sensor's zero offset is not
+  /// cancelled (it adds a small error when the tilt is not large against it).
+  final bool singleSided;
 
   /// The instrument stores the phase in ±180°.
   bool get inRange => angleDeg.abs() <= 180.0;
@@ -74,38 +80,77 @@ class PhaseEstimate {
 
   /// Good enough to apply without a second thought.
   bool get confident => snr >= 8 && uncertaintyDeg <= 0.5;
+
+  /// The same estimate rotated by [deg], kept in (−180°, 180°].
+  PhaseEstimate rotated(double deg) => PhaseEstimate(
+        angleDeg: wrapDegrees(angleDeg + deg),
+        uncertaintyDeg: uncertaintyDeg,
+        snr: snr,
+        stepMagnitude: stepMagnitude,
+        singleSided: singleSided,
+      );
 }
 
-/// Phase from a tilt step: the direction of `Δu = u_tilted − u_flat`, folded
-/// into (−90°, 90°] (the sign of the step is the invert flag's business, not
-/// the phase's). Null if either capture is too short or there is no step.
-PhaseEstimate? estimatePhase(ComplexStats flat, ComplexStats tilted) {
-  if (flat.n < 5 || tilted.n < 5) return null;
-  final dRe = tilted.meanRe - flat.meanRe;
-  final dIm = tilted.meanIm - flat.meanIm;
+/// [deg] folded into (−180°, 180°].
+double wrapDegrees(double deg) {
+  var a = deg;
+  while (a > 180) {
+    a -= 360;
+  }
+  while (a <= -180) {
+    a += 360;
+  }
+  return a;
+}
+
+/// Phase from captures of `u` with a clear tilt of each sign. A tilt moves
+/// `u` along `e^{jφ}`: a positive tilt points at φ, a negative one at
+/// φ + 180°.
+///
+/// * both [positive] and [negative]: φ is the direction of `u₊ − u₋`, so the
+///   sensor's zero offset cancels and the tilt size does not matter;
+/// * only one: φ is the direction of `u` itself (turned by 180° for the
+///   negative tilt), which assumes the zero offset is small against the
+///   signal.
+///
+/// Null if a capture is too short or there is no signal.
+PhaseEstimate? estimatePhaseFromTilts({
+  ComplexStats? positive,
+  ComplexStats? negative,
+}) {
+  if (positive == null && negative == null) return null;
+  if ((positive != null && positive.n < 5) ||
+      (negative != null && negative.n < 5)) {
+    return null;
+  }
+  final double dRe, dIm, seRe, seIm;
+  final double flip;
+  if (positive != null && negative != null) {
+    dRe = positive.meanRe - negative.meanRe;
+    dIm = positive.meanIm - negative.meanIm;
+    seRe = sqrt(positive.varRe / positive.n + negative.varRe / negative.n);
+    seIm = sqrt(positive.varIm / positive.n + negative.varIm / negative.n);
+    flip = 0;
+  } else {
+    final one = positive ?? negative!;
+    dRe = one.meanRe;
+    dIm = one.meanIm;
+    seRe = sqrt(one.varRe / one.n);
+    seIm = sqrt(one.varIm / one.n);
+    flip = positive != null ? 0 : 180;
+  }
   final mag = sqrt(dRe * dRe + dIm * dIm);
   if (mag == 0) return null;
 
-  var a = atan2(dIm, dRe) * 180 / pi;
-  while (a > 90) {
-    a -= 180;
-  }
-  while (a <= -90) {
-    a += 180;
-  }
-
-  final seRe = sqrt(flat.varRe / flat.n + tilted.varRe / tilted.n);
-  final seIm = sqrt(flat.varIm / flat.n + tilted.varIm / tilted.n);
   final ux = dRe / mag, uy = dIm / mag;
-  // Error component perpendicular to the step direction.
+  // Error component perpendicular to the signal direction.
   final sePerp = sqrt(pow(seRe * uy, 2) + pow(seIm * ux, 2));
-  final unc = atan2(sePerp, mag) * 180 / pi;
-  final snr = sePerp == 0 ? 1e9 : mag / sePerp;
   return PhaseEstimate(
-    angleDeg: a,
-    uncertaintyDeg: unc,
-    snr: snr,
+    angleDeg: wrapDegrees(atan2(dIm, dRe) * 180 / pi + flip),
+    uncertaintyDeg: atan2(sePerp, mag) * 180 / pi,
+    snr: sePerp == 0 ? 1e9 : mag / sePerp,
     stepMagnitude: mag,
+    singleSided: positive == null || negative == null,
   );
 }
 

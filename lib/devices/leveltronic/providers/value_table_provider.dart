@@ -4,8 +4,7 @@ import 'package:inclinometer/devices/leveltronic/api_catalog.dart';
 import 'package:inclinometer/devices/leveltronic/providers/leveltronic_provider.dart';
 
 /// Reads a table of Settings or Calibrations (one GET per row) and writes
-/// single rows back. A row the firmware does not have (an `optional` one
-/// answering UNKNOWN_RESOURCE) reads as null and the UI hides it.
+/// single rows back. A row that cannot be read is null.
 class ValueTableNotifier extends AsyncNotifier<Map<int, int?>> {
   ValueTableNotifier(this.defs);
 

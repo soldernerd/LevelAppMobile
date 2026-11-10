@@ -15,8 +15,8 @@ import 'package:inclinometer/devices/leveltronic/ui/widgets/service_card.dart';
 import 'package:inclinometer/devices/leveltronic/ui/widgets/wizard_scaffold.dart';
 import 'package:inclinometer/devices/leveltronic/ui/widgets/wizard_widgets.dart';
 
-/// Phase calibration: capture the raw signal level, then with a known tilt
-/// step; the direction of the change is each sensor's signal phase.
+/// Phase calibration: capture the signal with a clear positive and/or negative
+/// tilt; its direction is each sensor's signal phase.
 class PhaseCalScreen extends ConsumerWidget {
   const PhaseCalScreen({super.key});
 
@@ -37,15 +37,49 @@ class PhaseCalScreen extends ConsumerWidget {
             const Text(
               'Each sensor\'s signal is rotated by a calibrated phase so that '
               'a tilt falls entirely in the in-phase part. To find it the app '
-              'records the raw signal level and again with a known tilt step. '
-              'The size of the step does not matter for the phase — only '
-              'that it is clearly larger than the noise (0.1 mm under a 1 m '
-              'edge is plenty).',
+              'records the signal with a clear tilt: a positive tilt points '
+              'along the phase, a negative one the opposite way. The size of '
+              'the tilt does not matter — only that it is clearly larger than '
+              'the noise (0.1 mm under a 1 m edge is plenty).',
               style: TextStyle(color: Colors.white70, height: 1.4),
             ),
             const SizedBox(height: 16),
-            const InstrumentDiagram(pose: DiagramPose.shim),
+            const InstrumentDiagram(pose: DiagramPose.shimFront),
             const SizedBox(height: 8),
+            const Text('Tilts to measure',
+                style: TextStyle(color: Colors.white54)),
+            const SizedBox(height: 6),
+            SegmentedButton<PhaseMode>(
+              segments: const [
+                ButtonSegment(
+                  value: PhaseMode.both,
+                  label: Text('+ and −', key: ValueKey('phase-mode-both')),
+                ),
+                ButtonSegment(
+                  value: PhaseMode.positiveOnly,
+                  label: Text('+ only', key: ValueKey('phase-mode-pos')),
+                ),
+                ButtonSegment(
+                  value: PhaseMode.negativeOnly,
+                  label: Text('− only', key: ValueKey('phase-mode-neg')),
+                ),
+              ],
+              selected: {s.mode},
+              showSelectedIcon: false,
+              onSelectionChanged: (v) => n.selectMode(v.first),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              switch (s.mode) {
+                PhaseMode.both =>
+                  'Most accurate: the sensor\'s zero offset cancels out.',
+                PhaseMode.positiveOnly || PhaseMode.negativeOnly =>
+                  'One tilt is quicker, but the sensor\'s zero offset then '
+                      'adds a small error unless the tilt is large.',
+              },
+              style: const TextStyle(color: Colors.white54, height: 1.4),
+            ),
+            const SizedBox(height: 16),
             const Text('Calibrate', style: TextStyle(color: Colors.white54)),
             const SizedBox(height: 6),
             SensorSelector(mask: s.mask, onChanged: n.selectSensors),
@@ -65,45 +99,56 @@ class PhaseCalScreen extends ConsumerWidget {
           ],
         );
 
-      case PhaseStage.reference:
+      case PhaseStage.ready:
+        final positive = s.tilt == PhaseTilt.positive;
         return WizardScaffold(
           title: _title,
           children: [
-            const StepHeader(step: 1, total: 3, title: 'Reference'),
+            StepHeader(
+                step: s.step,
+                total: s.steps,
+                title: positive ? 'Positive tilt' : 'Negative tilt'),
             const SizedBox(height: 16),
-            const InstrumentDiagram(pose: DiagramPose.level),
+            InstrumentDiagram(
+                pose: positive ? DiagramPose.shimFront : DiagramPose.shim),
             const SizedBox(height: 8),
-            const Instructions([
-              'Put the instrument on the surface without any shim.',
-              'Keep the table still and do not touch the instrument.',
-              'Capture takes about 8 seconds.',
+            Instructions([
+              positive
+                  ? 'Raise the front (the end with the red mark) with a shim '
+                      '— at least 0.1 mm under a 1 m edge. The instrument '
+                      'should read a positive tilt.'
+                  : 'Raise the back (the end opposite the red mark) with a '
+                      'shim — at least 0.1 mm under a 1 m edge. The '
+                      'instrument should read a negative tilt.',
+              'Let it settle, keep it still, then capture (about 8 seconds).',
             ]),
           ],
           actions: [
             OutlinedButton(
-                onPressed: n.backToStart, child: const Text('Back')),
+              onPressed: s.step == 1 ? n.backToStart : n.redo,
+              child: Text(s.step == 1 ? 'Back' : 'Redo'),
+            ),
             FilledButton(
-              key: const ValueKey('phase-capture-ref'),
-              onPressed: n.captureReference,
-              child: const Text('Capture reference'),
+              key: const ValueKey('phase-capture'),
+              onPressed: n.capture,
+              child: Text(positive ? 'Capture positive' : 'Capture negative'),
             ),
           ],
         );
 
-      case PhaseStage.capturingReference:
-      case PhaseStage.capturingTilted:
-        final isRef = s.stage == PhaseStage.capturingReference;
+      case PhaseStage.capturing:
+        final positive = s.tilt == PhaseTilt.positive;
         return WizardScaffold(
           title: _title,
           canPop: false,
           children: [
             StepHeader(
-                step: isRef ? 1 : 2,
-                total: 3,
-                title: isRef ? 'Reference' : 'Tilt step'),
+                step: s.step,
+                total: s.steps,
+                title: positive ? 'Positive tilt' : 'Negative tilt'),
             const SizedBox(height: 16),
             InstrumentDiagram(
-                pose: isRef ? DiagramPose.level : DiagramPose.shim),
+                pose: positive ? DiagramPose.shimFront : DiagramPose.shim),
             const SizedBox(height: 16),
             ProgressPanel(
               key: const ValueKey('phase-progress'),
@@ -118,32 +163,6 @@ class PhaseCalScreen extends ConsumerWidget {
           ],
         );
 
-      case PhaseStage.tilted:
-        return WizardScaffold(
-          title: _title,
-          children: [
-            const StepHeader(step: 2, total: 3, title: 'Tilt step'),
-            const SizedBox(height: 16),
-            const InstrumentDiagram(pose: DiagramPose.shim),
-            const SizedBox(height: 8),
-            const Instructions([
-              'Raise one end of the surface (or the instrument\'s base) with '
-                  'a shim — at least 0.1 mm under a 1 m edge.',
-              'Let it settle, keep it still, then capture.',
-            ]),
-          ],
-          actions: [
-            OutlinedButton(
-                onPressed: n.redoReference,
-                child: const Text('Redo reference')),
-            FilledButton(
-              key: const ValueKey('phase-capture-tilt'),
-              onPressed: n.captureTilted,
-              child: const Text('Capture tilt'),
-            ),
-          ],
-        );
-
       case PhaseStage.review:
         final applicable = [
           for (var i = 0; i < 2; i++)
@@ -155,7 +174,7 @@ class PhaseCalScreen extends ConsumerWidget {
         return WizardScaffold(
           title: _title,
           children: [
-            const StepHeader(step: 3, total: 3, title: 'Result'),
+            StepHeader(step: s.steps + 1, total: s.steps + 1, title: 'Result'),
             const SizedBox(height: 16),
             for (var i = 0; i < 2; i++)
               if (SensorMask.has(s.mask, i))
@@ -172,8 +191,8 @@ class PhaseCalScreen extends ConsumerWidget {
           ],
           actions: [
             OutlinedButton(
-              onPressed: n.redoTilted,
-              child: const Text('Redo tilt'),
+              onPressed: n.redo,
+              child: const Text('Redo'),
             ),
             FilledButton(
               key: const ValueKey('phase-apply'),
@@ -329,14 +348,14 @@ class _EstimateCard extends StatelessWidget {
     final String verdict;
     if (e == null) {
       color = const Color(0xFFE53935);
-      verdict = 'No usable step was seen. Use a larger shim and redo the tilt.';
+      verdict = 'No usable signal was seen. Use a larger shim and redo.';
     } else if (!e.inRange) {
       color = const Color(0xFFE53935);
       verdict = 'The phase is outside ±180°. Check sensor cabling '
           'and orientation.';
     } else if (!e.confident) {
       color = const Color(0xFFFFA000);
-      verdict = 'Low confidence — a larger step or a quieter table would '
+      verdict = 'Low confidence — a larger tilt or a quieter table would '
           'give a better value. You can still apply it.';
     } else {
       color = const Color(0xFF43A047);
@@ -382,7 +401,8 @@ class _EstimateCard extends StatelessWidget {
           if (e != null)
             Text(
               'Signal-to-noise ${e.snr >= 1e6 ? '∞' : e.snr.toStringAsFixed(0)}'
-              '${storedCdeg == null ? '' : '   ·   stored now ${fmtCdeg(storedCdeg!)}'}',
+              '${storedCdeg == null ? '' : '   ·   stored now ${fmtCdeg(storedCdeg!)}'}'
+              '${e.singleSided ? '   ·   one tilt only' : ''}',
               style: const TextStyle(fontSize: 13, color: Colors.white54),
             ),
           const SizedBox(height: 6),

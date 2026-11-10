@@ -117,7 +117,7 @@ class InstrumentApi {
     return def.type.decode(data);
   }
 
-  /// Like [readValue], but a firmware without this (optional) resource gives
+  /// Like [readValue], but a firmware without this resource gives
   /// null instead of throwing.
   Future<int?> tryReadValue(ApiValueDef def) async {
     final r = await link.request(def.getOpcode);

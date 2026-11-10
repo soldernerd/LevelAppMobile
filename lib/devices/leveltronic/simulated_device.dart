@@ -29,7 +29,6 @@ class SimulatedDevice implements SimulatedPeripheral {
     this.noise = 0.0,
     this.apiVersion = kApiVersion,
     this.latency = Duration.zero,
-    this.supportsChargeFullTimeout = false,
     DateTime Function()? clock,
   }) : _rng = random ?? Random(1),
        _clock = clock ?? DateTime.now {
@@ -44,9 +43,6 @@ class SimulatedDevice implements SimulatedPeripheral {
 
   /// Artificial delay before each reply.
   final Duration latency;
-
-  /// Whether Settings 0x53 exists (it is not on firmware master yet).
-  final bool supportsChargeFullTimeout;
 
   final Random _rng;
   final DateTime Function() _clock;
@@ -76,6 +72,9 @@ class SimulatedDevice implements SimulatedPeripheral {
 
   /// Makes a precision measurement never find a clean window.
   bool precisionNeverClean = false;
+
+  /// How many precision measurements were started (tests).
+  int precisionRuns = 0;
 
   /// Service mode can only be entered on the instrument; this is its stand-in.
   void setServiceMode(bool on) {
@@ -446,9 +445,6 @@ class SimulatedDevice implements SimulatedPeripheral {
     final list = cat == ApiCat.settings ? kSettings : kCalibrations;
     for (final d in list) {
       if (d.id == res) {
-        if (d.optional && d.id == 0x53 && !supportsChargeFullTimeout) {
-          return null;
-        }
         return d;
       }
     }
@@ -647,6 +643,7 @@ class SimulatedDevice implements SimulatedPeripheral {
     if (!_demodRunning || _zPhase != ZeroCalPhase.idle) {
       return _err(ApiStatus.busyResource);
     }
+    precisionRuns++;
     _pPhase = PrecisionPhase.running;
     _pCount = 0;
     _pElapsed = 0;
@@ -755,7 +752,8 @@ class SimulatedDevice implements SimulatedPeripheral {
     // ADC channel order S2, B, A, S1; A − B at 90°.
     const rms = [4.1, 310.0, 309.5, 3.8];
     const p2p = [11.6, 877.0, 875.4, 10.8];
-    final ph = [truePhaseDeg[1], 270.0, 90.0, truePhaseDeg[0]];
+    // A sensor reads its own phase against the drive, which sits at 90°.
+    final ph = [truePhaseDeg[1] + 90, 270.0, 90.0, truePhaseDeg[0] + 90];
     for (var i = 0; i < 4; i++) {
       bd.setFloat32(4 * i, rms[i], Endian.little);
       bd.setFloat32(16 + 4 * i, p2p[i], Endian.little);

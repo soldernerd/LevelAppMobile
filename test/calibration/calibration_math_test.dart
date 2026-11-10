@@ -53,82 +53,106 @@ void main() {
     expect(complexDivide(1, 1, 0, 0), isNull);
   });
 
-  group('estimatePhase', () {
-    for (final truth in [-40.0, -12.5, 0.0, 3.0, 12.0, 44.0]) {
-      test('recovers $truth° from a tilt step', () {
-        final e = estimatePhase(capture(0, phaseDeg: truth, seed: 1),
-            capture(0.1, phaseDeg: truth, seed: 2))!;
-        expect(e.angleDeg, closeTo(truth, 0.1));
+  group('estimatePhaseFromTilts', () {
+    for (final truth in [-170.0, -90.0, -40.0, -12.5, 0.0, 3.0, 12.0, 44.0, 135.0, 180.0]) {
+      test('recovers $truth° from a positive and a negative tilt', () {
+        final e = estimatePhaseFromTilts(
+            positive: capture(0.1, phaseDeg: truth, seed: 1),
+            negative: capture(-0.1, phaseDeg: truth, seed: 2))!;
+        expect(wrapDegrees(e.angleDeg - truth).abs(), lessThan(0.1));
         expect(e.inRange, isTrue);
         expect(e.confident, isTrue);
-        expect(e.centiDegrees, closeTo(truth * 100, 10));
+        expect(e.singleSided, isFalse);
+      });
+
+      test('recovers $truth° from a positive tilt alone', () {
+        final e = estimatePhaseFromTilts(
+            positive: capture(0.1, phaseDeg: truth, seed: 1))!;
+        expect(wrapDegrees(e.angleDeg - truth).abs(), lessThan(0.5));
+        expect(e.singleSided, isTrue);
+      });
+
+      test('recovers $truth° from a negative tilt alone', () {
+        final e = estimatePhaseFromTilts(
+            negative: capture(-0.1, phaseDeg: truth, seed: 2))!;
+        expect(wrapDegrees(e.angleDeg - truth).abs(), lessThan(0.5));
+        expect(e.singleSided, isTrue);
       });
     }
 
-    test('the sign of the step does not change the phase', () {
-      final up = estimatePhase(
-          capture(0, seed: 1), capture(0.1, seed: 2))!;
-      final down = estimatePhase(
-          capture(0, seed: 1), capture(-0.1, seed: 2))!;
-      expect(down.angleDeg, closeTo(up.angleDeg, 0.1));
+    test('two tilts cancel the zero offset, one does not', () {
+      final both = estimatePhaseFromTilts(
+          positive: capture(0.1, zero: 0.001, phaseDeg: 30, seed: 1),
+          negative: capture(-0.1, zero: 0.001, phaseDeg: 30, seed: 2))!;
+      expect(both.angleDeg, closeTo(30, 0.1));
+      // An offset that is not along the signal (e.g. a crosstalk term).
+      ComplexStats offset(double tilt, int seed) {
+        final s = capture(tilt, zero: 0, phaseDeg: 30, seed: seed);
+        final r = ComplexStats();
+        for (var i = 0; i < 300; i++) {
+          r.add(s.meanRe + 0.002, s.meanIm - 0.002);
+        }
+        return r;
+      }
+
+      final withOffsetBoth =
+          estimatePhaseFromTilts(positive: offset(0.1, 1), negative: offset(-0.1, 2))!;
+      final withOffsetOne = estimatePhaseFromTilts(positive: offset(0.1, 1))!;
+      expect((withOffsetBoth.angleDeg - 30).abs(),
+          lessThan((withOffsetOne.angleDeg - 30).abs()));
+      expect(withOffsetBoth.angleDeg, closeTo(30, 0.1));
     });
 
-    test('does not depend on the step size', () {
-      final small = estimatePhase(
-          capture(0, seed: 1), capture(0.02, seed: 2))!;
-      final large = estimatePhase(
-          capture(0, seed: 1), capture(1.0, seed: 2))!;
+    test('does not depend on the tilt size', () {
+      final small = estimatePhaseFromTilts(
+          positive: capture(0.02, seed: 1), negative: capture(-0.02, seed: 2))!;
+      final large = estimatePhaseFromTilts(
+          positive: capture(1.0, seed: 1), negative: capture(-1.0, seed: 2))!;
       expect(small.angleDeg, closeTo(large.angleDeg, 0.3));
     });
 
-    test('a phase beyond ±180° is reported but not in range', () {
-      // estimatePhase folds into (−90°, 90°], so we test inRange via
-      // centiDegrees clamping: a value > 180° cannot be produced by the
-      // fold, but inRange accepts everything up to ±180°.
-      // Verify that a 70° phase (well within ±180°) is in range.
-      final e = estimatePhase(capture(0, phaseDeg: 70, seed: 1),
-          capture(0.1, phaseDeg: 70, seed: 2))!;
-      expect(e.angleDeg, closeTo(70, 0.1));
-      expect(e.inRange, isTrue);
-    });
-
-    test('a step buried in noise has low confidence and a wide error', () {
-      final e = estimatePhase(
-        capture(0, noise: 5e-3, n: 40, seed: 1),
-        capture(0.01, noise: 5e-3, n: 40, seed: 2),
+    test('a tilt buried in noise has low confidence and a wide error', () {
+      final e = estimatePhaseFromTilts(
+        positive: capture(0.01, noise: 5e-3, n: 40, seed: 1),
+        negative: capture(-0.01, noise: 5e-3, n: 40, seed: 2),
       )!;
       expect(e.confident, isFalse);
       expect(e.uncertaintyDeg, greaterThan(1));
     });
 
-    test('uncertainty shrinks with a bigger step', () {
-      final a = estimatePhase(capture(0, noise: 1e-4, seed: 1),
-          capture(0.02, noise: 1e-4, seed: 2))!;
-      final b = estimatePhase(capture(0, noise: 1e-4, seed: 1),
-          capture(0.5, noise: 1e-4, seed: 2))!;
+    test('uncertainty shrinks with a bigger tilt', () {
+      final a = estimatePhaseFromTilts(
+          positive: capture(0.02, noise: 1e-4, seed: 1),
+          negative: capture(-0.02, noise: 1e-4, seed: 2))!;
+      final b = estimatePhaseFromTilts(
+          positive: capture(0.5, noise: 1e-4, seed: 1),
+          negative: capture(-0.5, noise: 1e-4, seed: 2))!;
       expect(b.uncertaintyDeg, lessThan(a.uncertaintyDeg));
       expect(b.snr, greaterThan(a.snr));
     });
 
-    test('too few samples or no step gives null', () {
-      expect(estimatePhase(ComplexStats(), capture(0.1)), isNull);
-      expect(estimatePhase(capture(0.1, n: 3), capture(0.1, n: 3)), isNull);
-      final same = ComplexStats()..add(1, 1);
+    test('too few samples, nothing or no signal gives null', () {
+      expect(estimatePhaseFromTilts(), isNull);
+      expect(estimatePhaseFromTilts(positive: capture(0.1, n: 3)), isNull);
+      expect(
+          estimatePhaseFromTilts(
+              positive: capture(0.1), negative: capture(-0.1, n: 3)),
+          isNull);
+      final zero = ComplexStats();
       for (var i = 0; i < 10; i++) {
-        same.add(1, 1);
+        zero.add(0, 0);
       }
-      expect(estimatePhase(same, same), isNull);
+      expect(estimatePhaseFromTilts(positive: zero), isNull);
+      expect(estimatePhaseFromTilts(positive: zero, negative: zero), isNull);
     });
 
-    test('folds into (−90°, 90°]', () {
-      // The step points at 192°: same line as 12°.
-      final flat = ComplexStats();
-      final tilted = ComplexStats();
-      for (var i = 0; i < 20; i++) {
-        flat.add(0, 0);
-        tilted.add(cos(192 * pi / 180), sin(192 * pi / 180));
-      }
-      expect(estimatePhase(flat, tilted)!.angleDeg, closeTo(12, 1e-6));
+    test('rotated keeps the estimate in (−180°, 180°]', () {
+      final e = estimatePhaseFromTilts(
+          positive: capture(0.1, phaseDeg: 100, seed: 1))!;
+      expect(e.rotated(180).angleDeg, closeTo(-80, 0.1));
+      expect(e.rotated(-180).angleDeg, closeTo(-80, 0.1));
+      expect(wrapDegrees(540), closeTo(180, 1e-9));
+      expect(wrapDegrees(-180), closeTo(180, 1e-9));
     });
   });
 

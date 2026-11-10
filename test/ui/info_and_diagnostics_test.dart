@@ -5,6 +5,8 @@ import 'package:inclinometer/devices/leveltronic/simulated_device.dart';
 
 import '../support/app_harness.dart';
 
+String textOf(WidgetTester t, Finder f) => t.widget<Text>(f).data!;
+
 void main() {
   setUpAll(TestWidgetsFlutterBinding.ensureInitialized);
 
@@ -84,6 +86,8 @@ void main() {
     testWidgets('shows RMS, peak-to-peak and phase of all four channels',
         (tester) async {
       final h = await AppHarness.start(tester, location: loc);
+      // All four cards must be on screen (the list builds lazily).
+      await tester.binding.setSurfaceSize(const Size(420, 2600));
       await h.pump(tester, const Duration(seconds: 1));
       for (final ch in ['B', 'A', 'S1', 'S2']) {
         expect(find.byKey(ValueKey('diag-$ch')), findsOneWidget, reason: ch);
@@ -105,6 +109,8 @@ void main() {
     testWidgets('labels the channels as wired and shows the sensor PGA',
         (tester) async {
       final h = await AppHarness.start(tester, location: loc);
+      // All four cards must be on screen (the list builds lazily).
+      await tester.binding.setSurfaceSize(const Size(420, 2600));
       await h.pump(tester, const Duration(seconds: 1));
       // Shown as A, B, S1, S2, top to bottom, with their wired ADC channel.
       final ys = [
@@ -121,6 +127,28 @@ void main() {
         expect(find.byKey(ValueKey('pga-$ch')), findsOneWidget);
       }
       expect(find.text('PGA ×16'), findsNWidgets(4));
+      await h.dispose(tester);
+    });
+
+    testWidgets('shows the calibrated phase of S1 and S2', (tester) async {
+      final h = await AppHarness.start(tester, location: loc);
+      // All four cards must be on screen (the list builds lazily).
+      await tester.binding.setSurfaceSize(const Size(420, 2600));
+      await h.pump(tester, const Duration(seconds: 1));
+      // Simulator: true signal phases 12.0° / 10.5° against stored 10.0° /
+      // 9.0°, measured against the drive that sits at 90°.
+      expect(find.text('+102.0°'), findsOneWidget); // S1 measured
+      expect(find.text('+100.5°'), findsOneWidget); // S2 measured
+      String shown(String ch) => textOf(
+          tester,
+          find.descendant(
+              of: find.byKey(ValueKey('cal-phase-$ch')),
+              matching: find.textContaining('°')));
+      expect(shown('S1'), equals('+2.0°'));
+      expect(shown('S2'), equals('+1.5°'));
+      // A and B are references, not calibrated.
+      expect(find.byKey(const ValueKey('cal-phase-A')), findsNothing);
+      expect(find.byKey(const ValueKey('cal-phase-B')), findsNothing);
       await h.dispose(tester);
     });
 

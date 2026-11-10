@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:inclinometer/devices/leveltronic/calibration/calibration_math.dart'
+    show wrapDegrees;
 import 'package:inclinometer/devices/leveltronic/protocol.dart';
 import 'package:inclinometer/devices/leveltronic/providers/diagnostics_provider.dart';
 import 'package:inclinometer/devices/leveltronic/ui/widgets/format.dart';
@@ -16,6 +18,7 @@ class DiagnosticsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final diag = ref.watch(signalDiagProvider);
     final pga = ref.watch(sensorPgaProvider).value;
+    final stored = ref.watch(sensorPhaseProvider).value;
 
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
@@ -45,8 +48,11 @@ class DiagnosticsScreen extends ConsumerWidget {
                 'Channels A, B, S1, S2, with the ADC input each is wired to (A = ch2, '
                 'B = ch1, S1 = ch3, S2 = ch0) and its PGA gain. A and B are the '
                 'excitation references; S1 and S2 are the sensor signals. '
-                'Phase is referenced so that A − B sits at 90°. The drive to '
-                'the sensor is A − B, about 2 × A.',
+                'Phase is referenced so that A − B sits at 90°. The calibrated '
+                'phase of S1 and S2 is the measured phase relative to the '
+                'drive (minus 90°) less the stored phase: 0° or 180° means '
+                'the signal lies on the in-phase axis. The drive to the '
+                'sensor is A − B, about 2 × A.',
                 style: TextStyle(color: Colors.white60, height: 1.4),
               ),
               const SizedBox(height: 12),
@@ -55,6 +61,23 @@ class DiagnosticsScreen extends ConsumerWidget {
                   adc: i,
                   name: ApiSignalDiag.channelNames[i],
                   pga: pga?[i],
+                  calibratedDeg: switch (ApiSignalDiag.channelNames[i]) {
+                    // Relative to the drive (A − B sits at 90°), minus the
+                    // stored signal phase: 0° means a tilt reads fully in
+                    // phase.
+                    'S1' || 'S2' => stored == null ||
+                            stored[ApiSignalDiag.channelNames[i] == 'S1' ? 0 : 1] == null
+                        ? null
+                        : wrapDegrees(
+                            d.phaseDeg[i] -
+                                90 -
+                                stored[ApiSignalDiag.channelNames[i] == 'S1'
+                                        ? 0
+                                        : 1]! /
+                                    100,
+                          ),
+                    _ => null,
+                  },
                   rmsMv: d.rmsMv[i],
                   p2pMv: d.p2pMv[i],
                   phaseDeg: d.phaseDeg[i],
@@ -117,6 +140,7 @@ class _ChannelCard extends StatelessWidget {
     required this.adc,
     required this.name,
     required this.pga,
+    required this.calibratedDeg,
     required this.rmsMv,
     required this.p2pMv,
     required this.phaseDeg,
@@ -128,6 +152,10 @@ class _ChannelCard extends StatelessWidget {
 
   /// ADC PGA gain; null where the firmware cannot tell.
   final int? pga;
+
+  /// The measured phase relative to the drive, minus the stored phase; null
+  /// for A and B or when the stored phase is unknown.
+  final double? calibratedDeg;
   final double rmsMv;
   final double p2pMv;
   final double phaseDeg;
@@ -205,6 +233,18 @@ class _ChannelCard extends StatelessWidget {
               ),
             ],
           ),
+          if (calibratedDeg != null) ...[
+            const SizedBox(height: 10),
+            KeyedSubtree(
+              key: ValueKey('cal-phase-$name'),
+              child: _cell(
+                'CALIBRATED PHASE',
+                '${fmtSigned(calibratedDeg!, decimals: 1)}°',
+                value,
+                label,
+              ),
+            ),
+          ],
         ],
       ),
     );

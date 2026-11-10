@@ -214,19 +214,23 @@ void main() {
   });
 
   group('phase calibration wizard', () {
-    /// Runs the wizard up to the review stage with a tilt step of [step].
+    /// Runs the wizard up to the review stage, capturing each tilt of [mode]
+    /// with a tilt of +/- [step].
     PhaseCalState runToReview(FakeAsync async, SimHarness h,
         PhaseCalState Function() state,
-        {double step = 0.1}) {
+        {double step = 0.1, PhaseMode mode = PhaseMode.both}) {
       final n = h.container.read(phaseCalProvider.notifier);
+      n.selectMode(mode);
       n.begin();
-      h.sim.physicalTilt = [0.0, 0.0];
-      n.captureReference();
-      pass(async, const Duration(seconds: 9));
-      expect(state().stage, equals(PhaseStage.tilted));
-      h.sim.physicalTilt = [step, step];
-      n.captureTilted();
-      pass(async, const Duration(seconds: 9));
+      pass(async, const Duration(milliseconds: 200));
+      for (final tilt in mode.tilts) {
+        expect(state().stage, equals(PhaseStage.ready));
+        expect(state().tilt, equals(tilt));
+        final t = tilt == PhaseTilt.positive ? step : -step;
+        h.sim.physicalTilt = [t, t];
+        n.capture();
+        pass(async, const Duration(seconds: 9));
+      }
       return state();
     }
 
@@ -273,12 +277,50 @@ void main() {
       });
     });
 
-    test('works whichever way the step goes', () {
+    test('a single tilt of either sign finds the phase too', () {
       fakeAsync((async) {
         final h = SimHarness()..connect(async);
         final state = hold(h.container, phaseCalProvider);
-        final s = runToReview(async, h, state, step: -0.2);
-        expect(s.estimates[0]!.angleDeg, closeTo(h.sim.truePhaseDeg[0], 0.1));
+        final pos = runToReview(async, h, state,
+            step: 0.2, mode: PhaseMode.positiveOnly);
+        expect(pos.estimates[0]!.angleDeg, closeTo(h.sim.truePhaseDeg[0], 0.5));
+        expect(pos.estimates[0]!.singleSided, isTrue);
+
+        h.container.read(phaseCalProvider.notifier).backToStart();
+        pass(async, const Duration(milliseconds: 200));
+        final neg = runToReview(async, h, state,
+            step: 0.2, mode: PhaseMode.negativeOnly);
+        expect(neg.estimates[0]!.angleDeg, closeTo(h.sim.truePhaseDeg[0], 0.5));
+        expect(neg.estimates[1]!.angleDeg, closeTo(h.sim.truePhaseDeg[1], 0.5));
+      });
+    });
+
+    test('a phase beyond 90 degrees is found and written', () {
+      fakeAsync((async) {
+        final h = SimHarness()..connect(async);
+        h.sim.setServiceMode(true);
+        h.sim.truePhaseDeg = [150.0, -120.0];
+        final state = hold(h.container, phaseCalProvider);
+        final s = runToReview(async, h, state);
+        expect(s.estimates[0]!.angleDeg, closeTo(150, 0.2));
+        expect(s.estimates[1]!.angleDeg, closeTo(-120, 0.2));
+        h.container.read(phaseCalProvider.notifier).apply();
+        pass(async, const Duration(seconds: 1));
+        expect(h.sim.calibration(kS1Phase), closeTo(15000, 20));
+        expect(h.sim.calibration(kS2Phase), closeTo(-12000, 20));
+      });
+    });
+
+    test('an inverted sensor gets the phase that reads the tilt positive', () {
+      fakeAsync((async) {
+        final h = SimHarness()..connect(async);
+        h.sim.setCalibration(kS1Invert, 1);
+        final state = hold(h.container, phaseCalProvider);
+        final s = runToReview(async, h, state);
+        // Positive reads positive only with the raw signal turned around.
+        expect(s.estimates[0]!.angleDeg,
+            closeTo(h.sim.truePhaseDeg[0] - 180, 0.2));
+        expect(s.estimates[1]!.angleDeg, closeTo(h.sim.truePhaseDeg[1], 0.2));
       });
     });
 
@@ -311,7 +353,6 @@ void main() {
         h.sim.truePhaseDeg = [70.0, 10.5];
         final state = hold(h.container, phaseCalProvider);
         final s = runToReview(async, h, state);
-        // estimatePhase folds to (−90°, 90°] ⊂ ±180°, so always in range.
         expect(s.estimates[0]!.inRange, isTrue);
         expect(s.estimates[1]!.inRange, isTrue);
         h.container.read(phaseCalProvider.notifier).apply();
@@ -327,10 +368,11 @@ void main() {
         final state = hold(h.container, phaseCalProvider);
         final n = h.container.read(phaseCalProvider.notifier);
         n.begin();
+        pass(async, const Duration(milliseconds: 200));
         // The demodulation is stopped: no usable phasor stream.
         settle(async, h.mock.sim.request(opExecute(CmdRes.tiltDemod), [0]));
         h.sim.linkDown();
-        n.captureReference();
+        n.capture();
         pass(async, const Duration(seconds: 10));
         expect(state().stage, equals(PhaseStage.error));
       });
@@ -378,9 +420,8 @@ void main() {
         expect(done.kBefore![0], equals(45000));
         expect(done.kAfter![0], closeTo(50000, 300));
         expect(h.sim.calibration(kS1K), equals(done.kAfter![0]));
-        // The proof: the step now reads as the known 0.1 mm/m.
-        expect(done.verifyReading![0], closeTo(0.1, 0.002));
-        expect(done.verifyReading![1], closeTo(0.1, 0.002));
+        // Storing does not measure again: the device saw no precision run.
+        expect(h.sim.precisionRuns, equals(2));
       });
     });
 

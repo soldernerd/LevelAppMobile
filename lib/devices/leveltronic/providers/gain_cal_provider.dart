@@ -27,9 +27,6 @@ enum GainStage {
   /// Computed; the user reviews and applies.
   review,
   applying,
-
-  /// Re-measuring with the step still applied, to prove the new k.
-  verifying,
   done,
   error,
 }
@@ -48,7 +45,6 @@ class GainCalState {
     this.estimates = const [null, null],
     this.kBefore,
     this.kAfter,
-    this.verifyReading,
     this.message,
     this.needsService = false,
   });
@@ -75,9 +71,6 @@ class GainCalState {
   final List<int>? kBefore;
   final List<int>? kAfter;
 
-  /// Reading change [S1, S2] re-measured after applying (compare to the
-  /// known tilt).
-  final List<double>? verifyReading;
   final String? message;
   final bool needsService;
 
@@ -97,7 +90,6 @@ class GainCalState {
     List<GainEstimate?>? estimates,
     List<int>? kBefore,
     List<int>? kAfter,
-    List<double>? verifyReading,
     String? message,
     bool? needsService,
     bool keepStatus = false,
@@ -115,7 +107,6 @@ class GainCalState {
         estimates: estimates ?? this.estimates,
         kBefore: kBefore ?? this.kBefore,
         kAfter: kAfter ?? this.kAfter,
-        verifyReading: verifyReading ?? this.verifyReading,
         message: keepStatus ? this.message : message,
         needsService:
             keepStatus ? this.needsService : (needsService ?? false),
@@ -315,8 +306,8 @@ class GainCalNotifier extends Notifier<GainCalState> {
     state = state.copyWith(stage: GainStage.shim);
   }
 
-  /// Writes the estimated k of every selected sensor that has a usable one,
-  /// then re-measures with the step still applied to prove it.
+  /// Writes the estimated k of every selected sensor that has a usable one.
+  /// Nothing is measured again: the new k is only stored.
   Future<void> apply() async {
     if (state.stage != GainStage.review) return;
     final gen = ++_gen;
@@ -334,7 +325,7 @@ class GainCalNotifier extends Notifier<GainCalState> {
       final after = await _readK();
       if (gen != _gen) return;
       state = state.copyWith(
-        stage: GainStage.verifying,
+        stage: GainStage.done,
         kBefore: before,
         kAfter: after,
         currentK: after,
@@ -342,22 +333,6 @@ class GainCalNotifier extends Notifier<GainCalState> {
       );
     } catch (e) {
       _fail(gen, e);
-      return;
-    }
-
-    // Verification: the same step must now read as the known tilt.
-    final verify = await _measure(GainStage.verifying, GainStage.done);
-    if (verify != null) {
-      final base = state.baselineReading!;
-      state = state.copyWith(
-        stage: GainStage.done,
-        verifyReading: [
-          verify.tiltS1 - base[0],
-          verify.tiltS2 - base[1],
-        ],
-      );
-    } else if (state.stage != GainStage.error) {
-      state = state.copyWith(stage: GainStage.done);
     }
   }
 

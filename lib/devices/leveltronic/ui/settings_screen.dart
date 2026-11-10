@@ -86,7 +86,6 @@ class _ValueList extends ConsumerWidget {
         String? group;
         for (final d in defs) {
           final v = values[d.id];
-          if (d.optional && v == null) continue; // not in this firmware
           if (d.group != group) {
             group = d.group;
             children.add(Padding(

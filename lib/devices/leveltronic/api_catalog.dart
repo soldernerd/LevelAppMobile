@@ -114,14 +114,29 @@ const List<ApiValueDef> kSettings = [
   ApiValueDef(
     category: _s,
     id: 0x53,
-    label: 'Max time at 100 %',
+    label: 'Full-charge timeout',
     description:
-        'Charging stops after this many minutes at a full battery. Only '
-        'present in firmware builds that support it.',
+        'Stop charging after this long at a state of charge of "Full-charge '
+        'threshold" or more, or as soon as the charger reports standby, '
+        'whichever comes first (0 = never).',
     type: ValType.u16,
     min: 0,
-    max: 65535,
+    max: 1440,
     unit: 'min',
+    group: 'Power',
+  ),
+  ApiValueDef(
+    category: _s,
+    id: 0x54,
+    label: 'Full-charge threshold',
+    description:
+        'State of charge (voltage based) from which the full-charge timeout '
+        'runs. The reading often tops out at 97..99 % while the instrument '
+        'runs from the battery, so 100 would never fire.',
+    type: ValType.u16,
+    min: 50,
+    max: 100,
+    unit: '%',
     group: 'Power',
   ),
   ApiValueDef(

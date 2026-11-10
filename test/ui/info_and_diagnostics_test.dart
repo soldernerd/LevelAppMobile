@@ -153,7 +153,7 @@ void main() {
       await h.dispose(tester);
     });
 
-    testWidgets('scope screen: fixed ±1.2 V, zoom takes S1/S2 to ±200 mV',
+    testWidgets('scope screen: fixed ±1.2 V, S1/S2 scale selectable',
         (tester) async {
       final h = await AppHarness.start(tester, location: '/leveltronic/scope');
       await h.pump(tester, const Duration(seconds: 1));
@@ -161,9 +161,11 @@ void main() {
       expect(find.byKey(const ValueKey('scope-sensors')), findsOneWidget);
       expect(find.text('±1200 mV full scale'), findsNWidgets(2));
       await tester.tap(find.byKey(const ValueKey('scope-zoom')));
-      await tester.pump();
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('S1/S2 ±20 mV').last);
+      await tester.pumpAndSettle();
       expect(find.text('±1200 mV full scale'), findsOneWidget);
-      expect(find.text('±200 mV full scale'), findsOneWidget);
+      expect(find.text('±20 mV full scale'), findsOneWidget);
       await h.dispose(tester);
     });
 

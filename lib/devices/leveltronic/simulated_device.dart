@@ -159,6 +159,7 @@ class SimulatedDevice implements SimulatedPeripheral {
         0x51 => 3600,
         0x50 => 3400,
         0x53 => 120,
+        0x54 => 97,
         0x61 => 4,
         0x40 => 10,
         0x41 => 20,

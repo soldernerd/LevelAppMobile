@@ -114,7 +114,8 @@ void main() {
       expect(find.text('300 s'), findsOneWidget);
       expect(find.text('Charge start voltage'), findsOneWidget);
       expect(find.text('3700 mV'), findsOneWidget);
-      expect(find.text('Max time at 100 %'), findsOneWidget);
+      expect(find.text('Full-charge timeout'), findsOneWidget);
+      expect(find.text('Full-charge threshold'), findsOneWidget);
       expect(find.text('120 min'), findsOneWidget);
       await h.dispose(tester);
     });

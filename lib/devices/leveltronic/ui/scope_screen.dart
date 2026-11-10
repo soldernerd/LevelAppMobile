@@ -17,15 +17,19 @@ const Map<String, Color> kScopeColors = {
 /// The ADC's input range, ± this many mV.
 const double kScopeFullScaleMv = 1200;
 
-/// The sensor panel when zoomed, ± this many mV.
-const double kScopeZoomMv = 200;
+/// The selectable full scales of the sensor panel, ± mV.
+const List<double> kScopeScalesMv = [1200, 600, 200, 100, 50, 20];
+
+/// Vertical shift of S2 against S1 as a fraction of the panel's half height,
+/// so nearly identical traces do not hide each other.
+const double kScopeS2Shift = 0.02;
 
 /// An oscilloscope-style picture of the four channels.
 ///
 /// The scale is fixed on purpose — the full ±1.2 V of the ADC, with the zero
 /// line in the middle — so the traces can be watched while something is
 /// adjusted by hand. The only change is the zoom button, which takes the
-/// sensor panel to ±200 mV.
+/// sensor panel through ±600, 200, 100, 50 and 20 mV.
 ///
 /// The instrument reports amplitude and phase of each channel, not raw
 /// samples, so every trace is rebuilt as `peak · sin(ωt + φ)` with the peak
@@ -40,7 +44,8 @@ class ScopeScreen extends ConsumerStatefulWidget {
 }
 
 class _ScopeScreenState extends ConsumerState<ScopeScreen> {
-  bool _zoom = false;
+  /// Index into [kScopeScalesMv] of the sensor panel.
+  int _scale = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -53,11 +58,29 @@ class _ScopeScreenState extends ConsumerState<ScopeScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: TextButton.icon(
+            child: PopupMenuButton<int>(
               key: const ValueKey('scope-zoom'),
-              onPressed: () => setState(() => _zoom = !_zoom),
-              icon: Icon(_zoom ? Icons.zoom_out : Icons.zoom_in),
-              label: Text(_zoom ? 'S1/S2 ±200 mV' : 'Zoom S1/S2'),
+              tooltip: 'Scale of S1 and S2',
+              initialValue: _scale,
+              onSelected: (i) => setState(() => _scale = i),
+              itemBuilder: (_) => [
+                for (var i = 0; i < kScopeScalesMv.length; i++)
+                  PopupMenuItem(
+                    value: i,
+                    child: Text('S1/S2 ±${kScopeScalesMv[i].toStringAsFixed(0)} mV'),
+                  ),
+              ],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.zoom_in),
+                    const SizedBox(width: 4),
+                    Text('S1/S2 ±${kScopeScalesMv[_scale].toStringAsFixed(0)} mV'),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -102,7 +125,8 @@ class _ScopeScreenState extends ConsumerState<ScopeScreen> {
                     child: _Panel(
                       key: const ValueKey('scope-sensors'),
                       traces: [trace('S1'), trace('S2')],
-                      fullScaleMv: _zoom ? kScopeZoomMv : kScopeFullScaleMv,
+                      fullScaleMv: kScopeScalesMv[_scale],
+                      shiftS2: true,
                     ),
                   ),
                 ],
@@ -131,10 +155,18 @@ class _Trace {
 
 /// One screen: a legend with the amplitudes above a fixed-scale plot.
 class _Panel extends StatelessWidget {
-  const _Panel({super.key, required this.traces, required this.fullScaleMv});
+  const _Panel({
+    super.key,
+    required this.traces,
+    required this.fullScaleMv,
+    this.shiftS2 = false,
+  });
 
   final List<_Trace> traces;
   final double fullScaleMv;
+
+  /// Draw S2 slightly lower than S1 (see [kScopeS2Shift]).
+  final bool shiftS2;
 
   @override
   Widget build(BuildContext context) {
@@ -180,7 +212,7 @@ class _Panel extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
               child: CustomPaint(
                 size: Size.infinite,
-                painter: _ScopePainter(traces, fullScaleMv),
+                painter: _ScopePainter(traces, fullScaleMv, shiftS2),
               ),
             ),
           ),
@@ -191,10 +223,11 @@ class _Panel extends StatelessWidget {
 }
 
 class _ScopePainter extends CustomPainter {
-  _ScopePainter(this.traces, this.fullScaleMv);
+  _ScopePainter(this.traces, this.fullScaleMv, this.shiftS2);
 
   final List<_Trace> traces;
   final double fullScaleMv;
+  final bool shiftS2;
 
   /// 1¼ periods.
   static const _spanDeg = 450.0;
@@ -225,27 +258,46 @@ class _ScopePainter extends CustomPainter {
         ..strokeWidth = 1.5,
     );
 
-    // Voltage labels on the horizontal grid lines.
-    for (var j = 1; j < rows; j++) {
-      final mv = fullScaleMv * (rows / 2 - j) / (rows / 2);
-      final tp = TextPainter(
-        text: TextSpan(
-          text: mv == 0 ? '0' : '${mv > 0 ? '+' : '−'}${mv.abs().toStringAsFixed(0)}',
-          style: const TextStyle(color: Color(0xFF4F8A5C), fontSize: 10),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tp.paint(canvas, Offset(3, size.height * j / rows - tp.height - 1));
+    final amp = size.height / 2;
+
+    // Voltage labels on the horizontal grid lines. With two sensors, S1 has
+    // the left scale and S2 the right one, which is shifted with its trace.
+    void labels({required bool right, required Color color, double dy = 0}) {
+      for (var j = 1; j < rows; j++) {
+        final mv = fullScaleMv * (rows / 2 - j) / (rows / 2);
+        final tp = TextPainter(
+          text: TextSpan(
+            text: mv == 0
+                ? '0'
+                : '${mv > 0 ? '+' : '−'}${mv.abs().toStringAsFixed(0)}',
+            style: TextStyle(color: color, fontSize: 10),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        final x = right ? size.width - tp.width - 3 : 3.0;
+        tp.paint(canvas, Offset(x, size.height * j / rows - tp.height - 1 + dy));
+      }
     }
 
-    final amp = size.height / 2;
+    if (shiftS2) {
+      labels(right: false, color: kScopeColors['S1']!.withValues(alpha: 0.8));
+      labels(
+        right: true,
+        color: kScopeColors['S2']!.withValues(alpha: 0.8),
+        dy: kScopeS2Shift * amp,
+      );
+    } else {
+      labels(right: false, color: const Color(0xFF4F8A5C));
+    }
+
     const steps = 300;
     for (final t in traces) {
+      final dy = shiftS2 && t.name == 'S2' ? kScopeS2Shift * amp : 0.0;
       final path = Path();
       for (var k = 0; k <= steps; k++) {
         final deg = _spanDeg * k / steps;
         final v = t.peakMv * math.sin((deg + t.phaseDeg) * math.pi / 180);
-        final p = Offset(size.width * k / steps, mid - v / fullScaleMv * amp);
+        final p = Offset(size.width * k / steps, mid - v / fullScaleMv * amp + dy);
         if (k == 0) {
           path.moveTo(p.dx, p.dy);
         } else {
@@ -265,7 +317,7 @@ class _ScopePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_ScopePainter old) {
-    if (old.fullScaleMv != fullScaleMv) return true;
+    if (old.fullScaleMv != fullScaleMv || old.shiftS2 != shiftS2) return true;
     for (var i = 0; i < traces.length; i++) {
       if (traces[i].peakMv != old.traces[i].peakMv ||
           traces[i].phaseDeg != old.traces[i].phaseDeg) {

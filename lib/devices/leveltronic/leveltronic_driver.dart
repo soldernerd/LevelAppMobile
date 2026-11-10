@@ -7,6 +7,7 @@ import 'package:inclinometer/devices/leveltronic/instrument_api.dart';
 import 'package:inclinometer/devices/leveltronic/leveltronic_session.dart';
 import 'package:inclinometer/devices/leveltronic/ui/calibration_hub_screen.dart';
 import 'package:inclinometer/devices/leveltronic/ui/diagnostics_screen.dart';
+import 'package:inclinometer/devices/leveltronic/ui/scope_screen.dart';
 import 'package:inclinometer/devices/leveltronic/ui/flip_cal_screen.dart';
 import 'package:inclinometer/devices/leveltronic/ui/gain_cal_screen.dart';
 import 'package:inclinometer/devices/leveltronic/ui/info_screen.dart';
@@ -23,6 +24,7 @@ import 'package:inclinometer/devices/leveltronic/ui/settings_screen.dart';
 ///   /leveltronic/settings            ?tab=0 settings, 1 actions, 2 calibration
 ///   /leveltronic/info                all values
 ///   /leveltronic/diagnostics         signal diagnostics
+///   /leveltronic/scope               oscilloscope view of A, B, S1, S2
 /// ```
 class LeveltronicDriver extends DeviceDriver {
   const LeveltronicDriver();
@@ -94,6 +96,10 @@ class LeveltronicDriver extends DeviceDriver {
           GoRoute(
             path: 'diagnostics',
             builder: (context, state) => const DiagnosticsScreen(),
+          ),
+          GoRoute(
+            path: 'scope',
+            builder: (context, state) => const ScopeScreen(),
           ),
         ],
       );

@@ -16,13 +16,13 @@ String textOf(WidgetTester t, Finder f) => t.widget<Text>(f).data!;
 void main() {
   setUpAll(TestWidgetsFlutterBinding.ensureInitialized);
 
-  testWidgets('shows S1, S2 and Diff in mm/m with four decimals', (tester) async {
+  testWidgets('shows S1, S2 and Diff in mm/m with five decimals', (tester) async {
     final h = await AppHarness.start(tester);
 
     final s1 = textOf(tester, reading('S1'));
     final s2 = textOf(tester, reading('S2'));
     final diff = textOf(tester, reading('DIFF'));
-    final num = RegExp(r'^[+−]\d\.\d{4}$');
+    final num = RegExp(r'^[+−]\d\.\d{5}$');
     expect(num.hasMatch(s1), isTrue, reason: s1);
     expect(num.hasMatch(s2), isTrue, reason: s2);
     expect(num.hasMatch(diff), isTrue, reason: diff);
@@ -93,21 +93,21 @@ void main() {
         (tester) async {
       final h = await AppHarness.start(tester);
       final raw = textOf(tester, reading('DIFF'));
-      expect(raw, isNot(contains('0.0000')));
+      expect(raw, isNot(contains('0.00000')));
 
       await tester.tap(find.byKey(const ValueKey('zero-diff')));
       await h.pump(tester, const Duration(seconds: 4));
-      expect(textOf(tester, reading('DIFF')), matches(RegExp(r'^[+−]0\.0000$')));
+      expect(textOf(tester, reading('DIFF')), matches(RegExp(r'^[+−]0.00000$')));
       expect(h.container.read(tareProvider), isNotNull);
       // S1 and S2 are untouched.
-      expect(textOf(tester, reading('S1')), isNot(contains('0.0000')));
+      expect(textOf(tester, reading('S1')), isNot(contains('0.00000')));
       expect(find.text('zeroed'), findsOneWidget);
       expect(find.text('Re-zero Diff'), findsOneWidget);
 
       // The tilt then changes: Diff moves relative to the zero.
       h.sim.physicalTilt = [h.sim.physicalTilt[0] + 0.5, h.sim.physicalTilt[1]];
       await h.pump(tester, const Duration(seconds: 1));
-      expect(textOf(tester, reading('DIFF')), isNot(contains('0.0000')));
+      expect(textOf(tester, reading('DIFF')), isNot(contains('0.00000')));
       await h.dispose(tester);
     });
 
@@ -197,7 +197,7 @@ void main() {
     final api = h.container.read(instrumentApiProvider);
     await api.setTiltDemod(false);
     await h.pump(tester, const Duration(seconds: 1));
-    expect(textOf(tester, reading('S1')), equals('––.––––'));
+    expect(textOf(tester, reading('S1')), equals('––.–––––'));
     await h.dispose(tester);
   });
 }

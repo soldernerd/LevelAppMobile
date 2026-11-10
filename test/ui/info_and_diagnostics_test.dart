@@ -96,10 +96,10 @@ void main() {
       expect(find.text('PEAK–PEAK'), findsNWidgets(4));
       expect(find.text('PHASE'), findsNWidgets(4));
       // The simulator: S2 4.10 mV rms, B 310.0, A 309.5, S1 3.80.
-      expect(find.text('4.10 mV'), findsOneWidget);
-      expect(find.text('310.0 mV'), findsOneWidget);
-      expect(find.text('309.5 mV'), findsOneWidget);
-      expect(find.text('3.80 mV'), findsOneWidget);
+      expect(find.text('4.100 mV'), findsOneWidget);
+      expect(find.text('310.00 mV'), findsOneWidget);
+      expect(find.text('309.50 mV'), findsOneWidget);
+      expect(find.text('3.800 mV'), findsOneWidget);
       // A − B sits at 90°: A reads +90°, B 270°.
       expect(find.text('+90.0°'), findsOneWidget);
       expect(find.text('+270.0°'), findsOneWidget);
@@ -136,7 +136,7 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(420, 2600));
       await h.pump(tester, const Duration(seconds: 1));
       // Simulator: true signal phases 12.0° / 10.5° against stored 10.0° /
-      // 9.0°, measured against the drive that sits at 90°.
+      // 9.0°, measured with A at 90°.
       expect(find.text('+102.0°'), findsOneWidget); // S1 measured
       expect(find.text('+100.5°'), findsOneWidget); // S2 measured
       String shown(String ch) => textOf(
@@ -144,11 +144,26 @@ void main() {
           find.descendant(
               of: find.byKey(ValueKey('cal-phase-$ch')),
               matching: find.textContaining('°')));
-      expect(shown('S1'), equals('+2.0°'));
-      expect(shown('S2'), equals('+1.5°'));
+      // Positive tilt: follows A (90°) less the stored phase's error.
+      expect(shown('S1'), equals('+92.0°'));
+      expect(shown('S2'), equals('+91.5°'));
       // A and B are references, not calibrated.
       expect(find.byKey(const ValueKey('cal-phase-A')), findsNothing);
       expect(find.byKey(const ValueKey('cal-phase-B')), findsNothing);
+      await h.dispose(tester);
+    });
+
+    testWidgets('scope screen: fixed ±1.2 V, zoom takes S1/S2 to ±200 mV',
+        (tester) async {
+      final h = await AppHarness.start(tester, location: '/leveltronic/scope');
+      await h.pump(tester, const Duration(seconds: 1));
+      expect(find.byKey(const ValueKey('scope-excitation')), findsOneWidget);
+      expect(find.byKey(const ValueKey('scope-sensors')), findsOneWidget);
+      expect(find.text('±1200 mV full scale'), findsNWidgets(2));
+      await tester.tap(find.byKey(const ValueKey('scope-zoom')));
+      await tester.pump();
+      expect(find.text('±1200 mV full scale'), findsOneWidget);
+      expect(find.text('±200 mV full scale'), findsOneWidget);
       await h.dispose(tester);
     });
 

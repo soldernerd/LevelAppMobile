@@ -82,6 +82,7 @@ class InstrumentScreen extends ConsumerWidget {
               PopupMenuItem(value: 'settings', child: Text('Settings')),
               PopupMenuItem(value: 'info', child: Text('All values')),
               PopupMenuItem(value: 'diagnostics', child: Text('Diagnostics')),
+              PopupMenuItem(value: 'scope', child: Text('Oscilloscope')),
               PopupMenuDivider(),
               PopupMenuItem(value: 'disconnect', child: Text('Disconnect')),
             ],
@@ -226,6 +227,8 @@ class InstrumentScreen extends ConsumerWidget {
         context.push('/leveltronic/info');
       case 'diagnostics':
         context.push('/leveltronic/diagnostics');
+      case 'scope':
+        context.push('/leveltronic/scope');
       case 'disconnect':
         ref.read(connectionNotifierProvider.notifier).disconnect();
     }
@@ -295,7 +298,7 @@ class _ReadingCard extends StatelessWidget {
                 textBaseline: TextBaseline.alphabetic,
                 children: [
                   Text(
-                    show ? fmtTilt(value) : '––.––––',
+                    show ? fmtTilt(value, decimals: 5) : '––.–––––',
                     key: ValueKey('reading-$label'),
                     style: TextStyle(
                       fontSize: emphasis ? 76 : 62,

@@ -36,7 +36,7 @@ void main() {
 
       await h.pump(tester, const Duration(seconds: 5));
       expect(find.byKey(const ValueKey('precision-done')), findsOneWidget);
-      final num = RegExp(r'^[+−]\d\.\d{4} mm/m$');
+      final num = RegExp(r'^[+−]\d\.\d{5} mm/m$');
       for (final k in ['S1', 'S2', 'DIFF']) {
         final t = textOf(tester, find.byKey(ValueKey('precision-$k')));
         expect(num.hasMatch(t), isTrue, reason: '$k: $t');

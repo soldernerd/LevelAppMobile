@@ -170,7 +170,7 @@ class _Result extends StatelessWidget {
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerRight,
               child: Text(
-                '${fmtTilt(value)} mm/m',
+                '${fmtTilt(value, decimals: 5)} mm/m',
                 key: ValueKey('precision-$label'),
                 style: TextStyle(
                   fontSize: emphasis ? 44 : 34,

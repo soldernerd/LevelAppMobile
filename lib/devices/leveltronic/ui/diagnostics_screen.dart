@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:inclinometer/devices/leveltronic/calibration/calibration_math.dart'
-    show wrapDegrees;
 import 'package:inclinometer/devices/leveltronic/protocol.dart';
 import 'package:inclinometer/devices/leveltronic/providers/diagnostics_provider.dart';
 import 'package:inclinometer/devices/leveltronic/ui/widgets/format.dart';
+
+/// Folds an angle into [0°, 360°), the range the measured phases use.
+double _wrap360(double deg) => ((deg % 360) + 360) % 360;
 
 /// Signal diagnostics: RMS, peak-to-peak and phase of the four ADC channels
 /// (A, B, S1, S2) at the converter pins, and the tilt each sensor channel's
@@ -48,11 +49,11 @@ class DiagnosticsScreen extends ConsumerWidget {
                 'Channels A, B, S1, S2, with the ADC input each is wired to (A = ch2, '
                 'B = ch1, S1 = ch3, S2 = ch0) and its PGA gain. A and B are the '
                 'excitation references; S1 and S2 are the sensor signals. '
-                'Phase is referenced so that A − B sits at 90°. The calibrated '
-                'phase of S1 and S2 is the measured phase relative to the '
-                'drive (minus 90°) less the stored phase: 0° or 180° means '
-                'the signal lies on the in-phase axis. The drive to the '
-                'sensor is A − B, about 2 × A.',
+                'Phase is referenced so that A sits at about 90° and B at about '
+                '270°. The calibrated phase of S1 and S2 is the measured phase '
+                'less the stored phase: it follows A (90°) for a positive tilt '
+                'and B (270°) for a negative one. The drive to the sensor is '
+                'A − B, about 2 × A.',
                 style: TextStyle(color: Colors.white60, height: 1.4),
               ),
               const SizedBox(height: 12),
@@ -62,15 +63,13 @@ class DiagnosticsScreen extends ConsumerWidget {
                   name: ApiSignalDiag.channelNames[i],
                   pga: pga?[i],
                   calibratedDeg: switch (ApiSignalDiag.channelNames[i]) {
-                    // Relative to the drive (A − B sits at 90°), minus the
-                    // stored signal phase: 0° means a tilt reads fully in
-                    // phase.
+                    // Measured phase minus the stored signal phase: follows
+                    // A (90°) for a positive tilt, B (270°) for a negative.
                     'S1' || 'S2' => stored == null ||
                             stored[ApiSignalDiag.channelNames[i] == 'S1' ? 0 : 1] == null
                         ? null
-                        : wrapDegrees(
+                        : _wrap360(
                             d.phaseDeg[i] -
-                                90 -
                                 stored[ApiSignalDiag.channelNames[i] == 'S1'
                                         ? 0
                                         : 1]! /
@@ -250,7 +249,7 @@ class _ChannelCard extends StatelessWidget {
     );
   }
 
-  static String _mv(double v) => v.toStringAsFixed(v.abs() < 100 ? 2 : 1);
+  static String _mv(double v) => v.toStringAsFixed(v.abs() < 100 ? 3 : 2);
 
   static Widget _cell(String k, String v, TextStyle vs, TextStyle ks) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,

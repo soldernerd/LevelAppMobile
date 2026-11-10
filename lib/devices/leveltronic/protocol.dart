@@ -9,7 +9,6 @@ library;
 
 import 'dart:typed_data';
 
-
 class CmdRes {
   static const int powerOff = 0x40;
   static const int reboot = 0x41;
@@ -168,9 +167,9 @@ class ApiHealth {
 
   /// Human-readable reset causes, in bit order.
   List<String> get resetCauseNames => [
-        for (var i = 0; i < _resetNames.length; i++)
-          if ((resetCause >> i) & 1 == 1) _resetNames[i],
-      ];
+    for (var i = 0; i < _resetNames.length; i++)
+      if ((resetCause >> i) & 1 == 1) _resetNames[i],
+  ];
 
   static ApiHealth? decode(Uint8List d) {
     if (d.length < 31) return null;
@@ -325,7 +324,8 @@ class ApiLive {
   }
 }
 
-/// Topics SIGNAL_DIAG (56 bytes). Channel order is A, B, S1, S2.
+/// Topics SIGNAL_DIAG (56 bytes). Channels are in ADC order ch0..ch3, which the
+/// schematic wires as S2, B, A, S1.
 class ApiSignalDiag {
   const ApiSignalDiag({
     required this.rmsMv,
@@ -340,14 +340,14 @@ class ApiSignalDiag {
   final List<double> phaseDeg; // 4
   final double theoreticalTiltS1, theoreticalTiltS2;
 
-  static const channelNames = ['A', 'B', 'S1', 'S2'];
+  static const channelNames = ['S2', 'B', 'A', 'S1'];
 
   static ApiSignalDiag? decode(Uint8List d) {
     if (d.length < 56) return null;
     final bd = ByteData.sublistView(d);
     List<double> four(int off) => [
-          for (var i = 0; i < 4; i++) bd.getFloat32(off + 4 * i, Endian.little),
-        ];
+      for (var i = 0; i < 4; i++) bd.getFloat32(off + 4 * i, Endian.little),
+    ];
     return ApiSignalDiag(
       rmsMv: four(0),
       p2pMv: four(16),

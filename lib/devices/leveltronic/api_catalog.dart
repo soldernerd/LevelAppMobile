@@ -253,8 +253,7 @@ const ApiValueDef kS1Phase = ApiValueDef(
   category: _c,
   id: 0x42,
   label: 'S1 phase',
-  description:
-      'Phase of the tilt signal relative to the excitation reference.',
+  description: 'Phase of the tilt signal relative to the excitation reference.',
   type: ValType.i16,
   min: -18000,
   max: 18000,
@@ -301,8 +300,7 @@ const ApiValueDef kS2Phase = ApiValueDef(
   category: _c,
   id: 0x46,
   label: 'S2 phase',
-  description:
-      'Phase of the tilt signal relative to the excitation reference.',
+  description: 'Phase of the tilt signal relative to the excitation reference.',
   type: ValType.i16,
   min: -18000,
   max: 18000,
@@ -321,12 +319,41 @@ const ApiValueDef kS2Invert = ApiValueDef(
   service: true,
   group: 'Sensor 2',
 );
+const ApiValueDef kS1Pga = ApiValueDef(
+  category: _c,
+  id: 0x48,
+  label: 'S1 PGA gain',
+  description:
+      'ADC programmable gain of sensor 1, a power of two (1, 2, 4 … 128); '
+      'applied immediately, k stays stated for PGA 1. Firmware 0.11.8+.',
+  type: ValType.u8,
+  min: 1,
+  max: 128,
+  service: true,
+  optional: true,
+  group: 'Sensor 1',
+);
+const ApiValueDef kS2Pga = ApiValueDef(
+  category: _c,
+  id: 0x49,
+  label: 'S2 PGA gain',
+  description:
+      'ADC programmable gain of sensor 2, a power of two (1, 2, 4 … 128); '
+      'applied immediately, k stays stated for PGA 1. Firmware 0.11.8+.',
+  type: ValType.u8,
+  min: 1,
+  max: 128,
+  service: true,
+  optional: true,
+  group: 'Sensor 2',
+);
 
 /// Per-sensor calibration definitions, index 0 = S1, 1 = S2.
 const List<ApiValueDef> kSensorK = [kS1K, kS2K];
 const List<ApiValueDef> kSensorZero = [kS1Zero, kS2Zero];
 const List<ApiValueDef> kSensorPhase = [kS1Phase, kS2Phase];
 const List<ApiValueDef> kSensorInvert = [kS1Invert, kS2Invert];
+const List<ApiValueDef> kSensorPga = [kS1Pga, kS2Pga];
 
 /// All calibrations, for the generic editor (service mode to write).
 const List<ApiValueDef> kCalibrations = [
@@ -334,10 +361,12 @@ const List<ApiValueDef> kCalibrations = [
   kS1Zero,
   kS1Phase,
   kS1Invert,
+  kS1Pga,
   kS2K,
   kS2Zero,
   kS2Phase,
   kS2Invert,
+  kS2Pga,
   ApiValueDef(
     category: _c,
     id: 0x50,

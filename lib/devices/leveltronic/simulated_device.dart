@@ -31,8 +31,8 @@ class SimulatedDevice implements SimulatedPeripheral {
     this.latency = Duration.zero,
     this.supportsChargeFullTimeout = false,
     DateTime Function()? clock,
-  })  : _rng = random ?? Random(1),
-        _clock = clock ?? DateTime.now {
+  }) : _rng = random ?? Random(1),
+       _clock = clock ?? DateTime.now {
     _resetDefaults();
   }
 
@@ -180,14 +180,18 @@ class SimulatedDevice implements SimulatedPeripheral {
     put(kS2Phase, 900);
     put(kS2Invert, 0);
     for (final d in kCalibrations) {
-      _values.putIfAbsent(_key(d), () => switch (d.id) {
-            0x50 => 1000,
-            0x51 => 1000,
-            0x61 || 0x62 || 0x65 || 0x66 => 1000,
-            0x68 => 10,
-            0x63 => 1500,
-            _ => 0,
-          });
+      _values.putIfAbsent(
+        _key(d),
+        () => switch (d.id) {
+          0x50 => 1000,
+          0x51 => 1000,
+          0x61 || 0x62 || 0x65 || 0x66 => 1000,
+          0x68 => 10,
+          0x48 || 0x49 => 16,
+          0x63 => 1500,
+          _ => 0,
+        },
+      );
     }
   }
 
@@ -356,7 +360,9 @@ class SimulatedDevice implements SimulatedPeripheral {
         _putStr(b, 30, 20, '1371e8b0');
         return _ok(b);
       case SysRes.state:
-        return verb == ApiVerb.get ? _ok(_stateBytes()) : _err(ApiStatus.verbNotValid);
+        return verb == ApiVerb.get
+            ? _ok(_stateBytes())
+            : _err(ApiStatus.verbNotValid);
       case SysRes.health:
         if (verb != ApiVerb.get) return _err(ApiStatus.verbNotValid);
         final b = Uint8List(31);
@@ -400,8 +406,8 @@ class SimulatedDevice implements SimulatedPeripheral {
     final st = _charging
         ? BatteryState.charging
         : (_mv < (_values[_key(kSettings.firstWhere((d) => d.id == 0x51))] ?? 0)
-            ? BatteryState.low
-            : BatteryState.normal);
+              ? BatteryState.low
+              : BatteryState.normal);
     b[0] = st.value;
     b[1] = _soc;
     bd.setUint16(2, _mv, Endian.little);
@@ -440,7 +446,9 @@ class SimulatedDevice implements SimulatedPeripheral {
     final list = cat == ApiCat.settings ? kSettings : kCalibrations;
     for (final d in list) {
       if (d.id == res) {
-        if (d.optional && !supportsChargeFullTimeout) return null;
+        if (d.optional && d.id == 0x53 && !supportsChargeFullTimeout) {
+          return null;
+        }
         return d;
       }
     }
@@ -461,11 +469,13 @@ class SimulatedDevice implements SimulatedPeripheral {
     final v = def.type.decode(p);
     if (v < def.min || v > def.max) return _err(ApiStatus.invalidParameter);
     // Cross-field rule: critical < low.
-    if (cat == ApiCat.settings && res == 0x50 &&
+    if (cat == ApiCat.settings &&
+        res == 0x50 &&
         v >= _values[_key(kSettings.firstWhere((d) => d.id == 0x51))]!) {
       return _err(ApiStatus.invalidParameter);
     }
-    if (cat == ApiCat.settings && res == 0x51 &&
+    if (cat == ApiCat.settings &&
+        res == 0x51 &&
         v <= _values[_key(kSettings.firstWhere((d) => d.id == 0x50))]!) {
       return _err(ApiStatus.invalidParameter);
     }
@@ -594,9 +604,10 @@ class SimulatedDevice implements SimulatedPeripheral {
           final kMicro = _values[_key(kSensorK[i])]!;
           // math_zero_cal_new_zero(): new zero in mm/m, back to ppm.
           final newZeroMmPerM = oldZero / kMicro + (_zAvg1[i] + avg2) / 2;
-          final ppm = (newZeroMmPerM * kMicro)
-              .round()
-              .clamp(kSensorZero[i].min, kSensorZero[i].max);
+          final ppm = (newZeroMmPerM * kMicro).round().clamp(
+            kSensorZero[i].min,
+            kSensorZero[i].max,
+          );
           _values[_key(kSensorZero[i])] = ppm;
         }
         _rotated = false;
@@ -679,8 +690,10 @@ class SimulatedDevice implements SimulatedPeripheral {
     return b;
   }
 
-  void _pushPrecision() => _subs[opSubscribe(ApiCat.procedures, ProcRes.precision)]
-      ?.add(_precisionBytes());
+  void _pushPrecision() =>
+      _subs[opSubscribe(ApiCat.procedures, ProcRes.precision)]?.add(
+        _precisionBytes(),
+      );
 
   // --- Topics / procedures GET -----------------------------------------------------
 
@@ -798,8 +811,9 @@ class SimulatedDevice implements SimulatedPeripheral {
       return;
     }
     final period = payload != null && payload.length >= 4
-        ? ByteData.sublistView(Uint8List.fromList(payload))
-            .getUint32(0, Endian.little)
+        ? ByteData.sublistView(
+            Uint8List.fromList(payload),
+          ).getUint32(0, Endian.little)
         : intervalMs;
     if (cat == ApiCat.topics && res == TopicRes.phasorStream) {
       _phasorActive = true;
@@ -812,8 +826,10 @@ class SimulatedDevice implements SimulatedPeripheral {
       _ensureLiveTimer();
     } else if (cat == ApiCat.procedures) {
       // pushed on change; send the current state once like the device does
-      scheduleMicrotask(() => sub.add(
-          res == ProcRes.zeroCal ? _zeroBytes() : _precisionBytes()));
+      scheduleMicrotask(
+        () =>
+            sub.add(res == ProcRes.zeroCal ? _zeroBytes() : _precisionBytes()),
+      );
     } else {
       final data = _topicData(res);
       sub.timer = Timer.periodic(Duration(milliseconds: max(period, 50)), (_) {

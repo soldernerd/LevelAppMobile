@@ -15,6 +15,7 @@ class DiagnosticsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final diag = ref.watch(signalDiagProvider);
+    final pga = ref.watch(sensorPgaProvider).value;
 
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
@@ -41,11 +42,12 @@ class DiagnosticsScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             children: [
               const Text(
-                'Channels in ADC order. A and B are the excitation '
+                'Channels in ADC order, as wired on the board: ch0 = S2, '
+                'ch1 = B, ch2 = A, ch3 = S1. A and B are the excitation '
                 'references (A is the phase reference, 0°); S1 and S2 are the '
-                'sensor signals. Each exciter channel shows half the '
-                'differential drive amplitude — the actual drive to the sensor '
-                'is A − B = 2 × A.',
+                'sensor signals, shown with their ADC PGA gain. Each exciter '
+                'channel shows half the differential drive amplitude — the '
+                'actual drive to the sensor is A − B = 2 × A.',
                 style: TextStyle(color: Colors.white60, height: 1.4),
               ),
               const SizedBox(height: 12),
@@ -53,6 +55,11 @@ class DiagnosticsScreen extends ConsumerWidget {
                 _ChannelCard(
                   index: i,
                   name: ApiSignalDiag.channelNames[i],
+                  pga: switch (ApiSignalDiag.channelNames[i]) {
+                    'S1' => pga?[0],
+                    'S2' => pga?[1],
+                    _ => null,
+                  },
                   rmsMv: d.rmsMv[i],
                   p2pMv: d.p2pMv[i],
                   phaseDeg: d.phaseDeg[i],
@@ -71,11 +78,14 @@ class DiagnosticsScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Theoretical tilt from the signal amplitude',
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white70)),
+                    const Text(
+                      'Theoretical tilt from the signal amplitude',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white70,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     _kv('S1', '${fmtTilt(d.theoreticalTiltS1)} mm/m'),
                     _kv('S2', '${fmtTilt(d.theoreticalTiltS2)} mm/m'),
@@ -90,24 +100,28 @@ class DiagnosticsScreen extends ConsumerWidget {
   }
 
   static Widget _kv(String k, String v) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(k, style: const TextStyle(color: Colors.white)),
-            Text(v,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontFeatures: [FontFeature.tabularFigures()])),
-          ],
+    padding: const EdgeInsets.symmetric(vertical: 3),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(k, style: const TextStyle(color: Colors.white)),
+        Text(
+          v,
+          style: const TextStyle(
+            color: Colors.white,
+            fontFeatures: [FontFeature.tabularFigures()],
+          ),
         ),
-      );
+      ],
+    ),
+  );
 }
 
 class _ChannelCard extends StatelessWidget {
   const _ChannelCard({
     required this.index,
     required this.name,
+    required this.pga,
     required this.rmsMv,
     required this.p2pMv,
     required this.phaseDeg,
@@ -116,6 +130,9 @@ class _ChannelCard extends StatelessWidget {
 
   final int index;
   final String name;
+
+  /// ADC PGA gain; null for A and B or where the firmware cannot tell.
+  final int? pga;
   final double rmsMv;
   final double p2pMv;
   final double phaseDeg;
@@ -143,13 +160,28 @@ class _ChannelCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text(name,
-                  style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white)),
+              Text(
+                name,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
               const SizedBox(width: 8),
               Text('channel $index', style: label),
+              if (pga != null) ...[
+                const Spacer(),
+                Text(
+                  'PGA ×$pga',
+                  key: ValueKey('pga-$name'),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white70,
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 8),
@@ -166,10 +198,16 @@ class _ChannelCard extends StatelessWidget {
             children: [
               Expanded(child: _cell('RMS', '${_mv(rmsMv)} mV', value, label)),
               Expanded(
-                  child: _cell('PEAK–PEAK', '${_mv(p2pMv)} mV', value, label)),
+                child: _cell('PEAK–PEAK', '${_mv(p2pMv)} mV', value, label),
+              ),
               Expanded(
-                  child: _cell('PHASE',
-                      '${fmtSigned(phaseDeg, decimals: 1)}°', value, label)),
+                child: _cell(
+                  'PHASE',
+                  '${fmtSigned(phaseDeg, decimals: 1)}°',
+                  value,
+                  label,
+                ),
+              ),
             ],
           ),
         ],
@@ -179,9 +217,12 @@ class _ChannelCard extends StatelessWidget {
 
   static String _mv(double v) => v.toStringAsFixed(v.abs() < 100 ? 2 : 1);
 
-  static Widget _cell(String k, String v, TextStyle vs, TextStyle ks) =>
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [Text(k, style: ks), const SizedBox(height: 2), Text(v, style: vs)],
-      );
+  static Widget _cell(String k, String v, TextStyle vs, TextStyle ks) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(k, style: ks),
+      const SizedBox(height: 2),
+      Text(v, style: vs),
+    ],
+  );
 }

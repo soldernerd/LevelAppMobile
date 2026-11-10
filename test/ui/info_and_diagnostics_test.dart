@@ -102,6 +102,26 @@ void main() {
       await h.dispose(tester);
     });
 
+    testWidgets('labels the channels as wired and shows the sensor PGA',
+        (tester) async {
+      final h = await AppHarness.start(tester, location: loc);
+      await h.pump(tester, const Duration(seconds: 1));
+      // ADC order ch0..ch3 = S2, B, A, S1, top to bottom.
+      final ys = [
+        for (final ch in ['S2', 'B', 'A', 'S1'])
+          tester.getTopLeft(find.byKey(ValueKey('diag-$ch'))).dy,
+      ];
+      expect(ys, equals([...ys]..sort()));
+      expect(find.text('channel 0'), findsOneWidget);
+      expect(find.text('channel 3'), findsOneWidget);
+      // Only the sensor channels have a PGA.
+      expect(find.byKey(const ValueKey('pga-S1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('pga-S2')), findsOneWidget);
+      expect(find.byKey(const ValueKey('pga-A')), findsNothing);
+      expect(find.text('PGA ×16'), findsNWidgets(2));
+      await h.dispose(tester);
+    });
+
     testWidgets('lists the theoretical tilt of each sensor', (tester) async {
       final h = await AppHarness.start(tester, location: loc);
       await h.pump(tester, const Duration(seconds: 1));

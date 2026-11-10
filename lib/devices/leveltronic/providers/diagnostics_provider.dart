@@ -5,7 +5,7 @@ import 'package:inclinometer/devices/leveltronic/protocol.dart';
 import 'package:inclinometer/devices/leveltronic/providers/leveltronic_provider.dart';
 
 /// Topics SIGNAL_DIAG: RMS, peak-to-peak and phase of the four ADC channels
-/// (ch0..ch3 = S2, B, A, S1). Only subscribed while a screen watches it.
+/// (ADC channel order S2, B, A, S1). Only subscribed while a screen watches it.
 final signalDiagProvider = StreamProvider.autoDispose<ApiSignalDiag>((ref) {
   return ref.watch(instrumentApiProvider).signalDiagUpdates(intervalMs: 500);
 });
@@ -14,5 +14,5 @@ final signalDiagProvider = StreamProvider.autoDispose<ApiSignalDiag>((ref) {
 /// null where the firmware (before 0.11.8) does not have the resource.
 final sensorPgaProvider = FutureProvider.autoDispose<List<int?>>((ref) async {
   final api = ref.watch(instrumentApiProvider);
-  return [for (final d in kSensorPga) await api.tryReadValue(d)];
+  return [for (final d in kChannelPga) await api.tryReadValue(d)];
 });

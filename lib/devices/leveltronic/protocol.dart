@@ -324,8 +324,10 @@ class ApiLive {
   }
 }
 
-/// Topics SIGNAL_DIAG (56 bytes). Channels are in ADC order ch0..ch3, which the
-/// schematic wires as S2, B, A, S1.
+/// Topics SIGNAL_DIAG (56 bytes). Since firmware 0.13.0 every group of four
+/// values follows the ADC channels: S2 (ch0), B (ch1), A (ch2), S1 (ch3); see
+/// the firmware's docs/channel-map.md.
+/// Phase is referenced so that A − B sits at 90° (A about +90°, B about 270°).
 class ApiSignalDiag {
   const ApiSignalDiag({
     required this.rmsMv,
@@ -335,12 +337,16 @@ class ApiSignalDiag {
     required this.theoreticalTiltS2,
   });
 
-  final List<double> rmsMv; // 4
-  final List<double> p2pMv; // 4
-  final List<double> phaseDeg; // 4
+  final List<double> rmsMv; // 4, ADC order
+  final List<double> p2pMv; // 4, ADC order
+  final List<double> phaseDeg; // 4, ADC order
   final double theoreticalTiltS1, theoreticalTiltS2;
 
+  /// Signal name of each ADC channel ch0..ch3.
   static const channelNames = ['S2', 'B', 'A', 'S1'];
+
+  /// The ADC channels in the order the app shows them: A, B, S1, S2.
+  static const displayOrder = [2, 1, 3, 0];
 
   static ApiSignalDiag? decode(Uint8List d) {
     if (d.length < 56) return null;
@@ -358,7 +364,8 @@ class ApiSignalDiag {
   }
 }
 
-/// One Topics PHASOR_STREAM push: the raw phasors of a 64-cycle batch.
+/// One Topics PHASOR_STREAM push: the raw phasors of a 64-cycle batch (wire
+/// order S2, B, A, S1 since firmware 0.13.0).
 class ApiPhasorEntry {
   const ApiPhasorEntry({
     required this.iB,
@@ -382,14 +389,14 @@ class ApiPhasorEntry {
     final bd = ByteData.sublistView(d);
     double f(int i) => bd.getFloat32(4 * i, Endian.little);
     return ApiPhasorEntry(
-      iB: f(0),
-      qB: f(1),
-      iA: f(2),
-      qA: f(3),
-      iS1: f(4),
-      qS1: f(5),
-      iS2: f(6),
-      qS2: f(7),
+      iS2: f(0),
+      qS2: f(1),
+      iB: f(2),
+      qB: f(3),
+      iA: f(4),
+      qA: f(5),
+      iS1: f(6),
+      qS1: f(7),
       seq: bd.getUint16(32, Endian.little),
     );
   }
@@ -397,7 +404,7 @@ class ApiPhasorEntry {
   Uint8List encode() {
     final b = Uint8List(34);
     final bd = ByteData.sublistView(b);
-    final v = [iB, qB, iA, qA, iS1, qS1, iS2, qS2];
+    final v = [iS2, qS2, iB, qB, iA, qA, iS1, qS1];
     for (var i = 0; i < 8; i++) {
       bd.setFloat32(4 * i, v[i], Endian.little);
     }

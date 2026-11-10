@@ -168,7 +168,7 @@ void main() {
       'Calibration': 'Phase',
       'Settings': 'Auto power-off',
       'All values': 'BATTERY',
-      'Diagnostics': 'Channels in ADC order',
+      'Diagnostics': 'with the ADC input each is wired to',
     }.entries) {
       await openMenuItem(entry.key);
       expect(find.textContaining(entry.value, findRichText: true),

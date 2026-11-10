@@ -187,7 +187,7 @@ class SimulatedDevice implements SimulatedPeripheral {
           0x51 => 1000,
           0x61 || 0x62 || 0x65 || 0x66 => 1000,
           0x68 => 10,
-          0x48 || 0x49 => 16,
+          0x48 || 0x49 || 0x4A || 0x4B => 16,
           0x63 => 1500,
           _ => 0,
         },
@@ -752,10 +752,10 @@ class SimulatedDevice implements SimulatedPeripheral {
   Uint8List _diagBytes() {
     final b = Uint8List(56);
     final bd = ByteData.sublistView(b);
-    // Channel order S2, B, A, S1.
+    // ADC channel order S2, B, A, S1; A − B at 90°.
     const rms = [4.1, 310.0, 309.5, 3.8];
     const p2p = [11.6, 877.0, 875.4, 10.8];
-    final ph = [truePhaseDeg[1], 180.0, 0.0, truePhaseDeg[0]];
+    final ph = [truePhaseDeg[1], 270.0, 90.0, truePhaseDeg[0]];
     for (var i = 0; i < 4; i++) {
       bd.setFloat32(4 * i, rms[i], Endian.little);
       bd.setFloat32(16 + 4 * i, p2p[i], Endian.little);

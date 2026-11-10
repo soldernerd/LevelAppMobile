@@ -298,7 +298,7 @@ void main() {
       expect(l.tiltDiff, closeTo(0.6234, 1e-6));
     });
 
-    test('SIGNAL_DIAG (56 bytes), channel order A, B, S1, S2', () {
+    test('SIGNAL_DIAG (56 bytes), ADC channel order S2, B, A, S1', () {
       final b = Uint8List(56);
       final bd = ByteData.sublistView(b);
       for (var i = 0; i < 4; i++) {
@@ -310,6 +310,10 @@ void main() {
       bd.setFloat32(52, -0.25, Endian.little);
       final d = ApiSignalDiag.decode(b)!;
       expect(ApiSignalDiag.channelNames, equals(['S2', 'B', 'A', 'S1']));
+      // Shown as A, B, S1, S2.
+      expect([
+        for (final i in ApiSignalDiag.displayOrder) ApiSignalDiag.channelNames[i]
+      ], equals(['A', 'B', 'S1', 'S2']));
       expect(d.rmsMv, equals([10.0, 11.0, 12.0, 13.0]));
       expect(d.p2pMv, equals([30.0, 31.0, 32.0, 33.0]));
       expect(d.phaseDeg, equals([0.0, 90.0, 180.0, 270.0]));
@@ -324,6 +328,12 @@ void main() {
       expect(back.iB, equals(-1));
       expect(back.qS2, equals(6));
       expect(back.seq, equals(640));
+      // Wire order S2, B, A, S1 (firmware 0.13.0+).
+      final bd = ByteData.sublistView(e.encode());
+      expect(bd.getFloat32(0, Endian.little), equals(5)); // iS2
+      expect(bd.getFloat32(8, Endian.little), equals(-1)); // iB
+      expect(bd.getFloat32(16, Endian.little), equals(1)); // iA
+      expect(bd.getFloat32(24, Endian.little), equals(3)); // iS1
     });
 
     test('Procedures ZERO_CAL (6 bytes)', () {

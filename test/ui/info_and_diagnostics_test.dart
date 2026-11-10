@@ -85,7 +85,7 @@ void main() {
         (tester) async {
       final h = await AppHarness.start(tester, location: loc);
       await h.pump(tester, const Duration(seconds: 1));
-      for (final ch in ['S2', 'B', 'A', 'S1']) {
+      for (final ch in ['B', 'A', 'S1', 'S2']) {
         expect(find.byKey(ValueKey('diag-$ch')), findsOneWidget, reason: ch);
       }
       expect(find.text('RMS'), findsNWidgets(4));
@@ -96,9 +96,9 @@ void main() {
       expect(find.text('310.0 mV'), findsOneWidget);
       expect(find.text('309.5 mV'), findsOneWidget);
       expect(find.text('3.80 mV'), findsOneWidget);
-      // A is the phase reference.
-      expect(find.text('+0.0°'), findsOneWidget);
-      expect(find.text('+180.0°'), findsOneWidget);
+      // A − B sits at 90°: A reads +90°, B 270°.
+      expect(find.text('+90.0°'), findsOneWidget);
+      expect(find.text('+270.0°'), findsOneWidget);
       await h.dispose(tester);
     });
 
@@ -106,19 +106,21 @@ void main() {
         (tester) async {
       final h = await AppHarness.start(tester, location: loc);
       await h.pump(tester, const Duration(seconds: 1));
-      // ADC order ch0..ch3 = S2, B, A, S1, top to bottom.
+      // Shown as A, B, S1, S2, top to bottom, with their wired ADC channel.
       final ys = [
-        for (final ch in ['S2', 'B', 'A', 'S1'])
+        for (final ch in ['A', 'B', 'S1', 'S2'])
           tester.getTopLeft(find.byKey(ValueKey('diag-$ch'))).dy,
       ];
       expect(ys, equals([...ys]..sort()));
-      expect(find.text('channel 0'), findsOneWidget);
-      expect(find.text('channel 3'), findsOneWidget);
-      // Only the sensor channels have a PGA.
-      expect(find.byKey(const ValueKey('pga-S1')), findsOneWidget);
-      expect(find.byKey(const ValueKey('pga-S2')), findsOneWidget);
-      expect(find.byKey(const ValueKey('pga-A')), findsNothing);
-      expect(find.text('PGA ×16'), findsNWidgets(2));
+      expect(find.text('ADC ch2'), findsOneWidget); // A
+      expect(find.text('ADC ch1'), findsOneWidget); // B
+      expect(find.text('ADC ch3'), findsOneWidget); // S1
+      expect(find.text('ADC ch0'), findsOneWidget); // S2
+      // All four channels show their PGA.
+      for (final ch in ['A', 'B', 'S1', 'S2']) {
+        expect(find.byKey(ValueKey('pga-$ch')), findsOneWidget);
+      }
+      expect(find.text('PGA ×16'), findsNWidgets(4));
       await h.dispose(tester);
     });
 

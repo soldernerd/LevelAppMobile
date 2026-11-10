@@ -42,24 +42,19 @@ class DiagnosticsScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             children: [
               const Text(
-                'Channels in ADC order, as wired on the board: ch0 = S2, '
-                'ch1 = B, ch2 = A, ch3 = S1. A and B are the excitation '
-                'references (A is the phase reference, 0°); S1 and S2 are the '
-                'sensor signals, shown with their ADC PGA gain. Each exciter '
-                'channel shows half the differential drive amplitude — the '
-                'actual drive to the sensor is A − B = 2 × A.',
+                'Channels A, B, S1, S2, with the ADC input each is wired to (A = ch2, '
+                'B = ch1, S1 = ch3, S2 = ch0) and its PGA gain. A and B are the '
+                'excitation references; S1 and S2 are the sensor signals. '
+                'Phase is referenced so that A − B sits at 90°. The drive to '
+                'the sensor is A − B, about 2 × A.',
                 style: TextStyle(color: Colors.white60, height: 1.4),
               ),
               const SizedBox(height: 12),
-              for (var i = 0; i < 4; i++) ...[
+              for (final i in ApiSignalDiag.displayOrder) ...[
                 _ChannelCard(
-                  index: i,
+                  adc: i,
                   name: ApiSignalDiag.channelNames[i],
-                  pga: switch (ApiSignalDiag.channelNames[i]) {
-                    'S1' => pga?[0],
-                    'S2' => pga?[1],
-                    _ => null,
-                  },
+                  pga: pga?[i],
                   rmsMv: d.rmsMv[i],
                   p2pMv: d.p2pMv[i],
                   phaseDeg: d.phaseDeg[i],
@@ -119,7 +114,7 @@ class DiagnosticsScreen extends ConsumerWidget {
 
 class _ChannelCard extends StatelessWidget {
   const _ChannelCard({
-    required this.index,
+    required this.adc,
     required this.name,
     required this.pga,
     required this.rmsMv,
@@ -128,10 +123,10 @@ class _ChannelCard extends StatelessWidget {
     required this.maxRms,
   });
 
-  final int index;
+  final int adc;
   final String name;
 
-  /// ADC PGA gain; null for A and B or where the firmware cannot tell.
+  /// ADC PGA gain; null where the firmware cannot tell.
   final int? pga;
   final double rmsMv;
   final double p2pMv;
@@ -169,7 +164,7 @@ class _ChannelCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text('channel $index', style: label),
+              Text('ADC ch$adc', style: label),
               if (pga != null) ...[
                 const Spacer(),
                 Text(

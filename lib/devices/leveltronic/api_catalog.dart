@@ -347,6 +347,35 @@ const ApiValueDef kS2Pga = ApiValueDef(
   optional: true,
   group: 'Sensor 2',
 );
+const ApiValueDef kAPga = ApiValueDef(
+  category: _c,
+  id: 0x4A,
+  label: 'A PGA gain',
+  description:
+      'ADC programmable gain of excitation A (ADC ch2), a power of two; '
+      'applied immediately. The input range is ±1.2 V / PGA and A is already '
+      'about 0.6 V peak at PGA 1: a higher gain clips. Firmware 0.12.0+.',
+  type: ValType.u8,
+  min: 1,
+  max: 128,
+  service: true,
+  optional: true,
+  group: 'Excitation',
+);
+const ApiValueDef kBPga = ApiValueDef(
+  category: _c,
+  id: 0x4B,
+  label: 'B PGA gain',
+  description:
+      'ADC programmable gain of excitation B (ADC ch1), a power of two; same '
+      'remark as A. Firmware 0.12.0+.',
+  type: ValType.u8,
+  min: 1,
+  max: 128,
+  service: true,
+  optional: true,
+  group: 'Excitation',
+);
 
 /// Per-sensor calibration definitions, index 0 = S1, 1 = S2.
 const List<ApiValueDef> kSensorK = [kS1K, kS2K];
@@ -354,6 +383,9 @@ const List<ApiValueDef> kSensorZero = [kS1Zero, kS2Zero];
 const List<ApiValueDef> kSensorPhase = [kS1Phase, kS2Phase];
 const List<ApiValueDef> kSensorInvert = [kS1Invert, kS2Invert];
 const List<ApiValueDef> kSensorPga = [kS1Pga, kS2Pga];
+
+/// The PGA of each ADC channel ch0..ch3 (S2, B, A, S1).
+const List<ApiValueDef> kChannelPga = [kS2Pga, kBPga, kAPga, kS1Pga];
 
 /// All calibrations, for the generic editor (service mode to write).
 const List<ApiValueDef> kCalibrations = [
@@ -367,6 +399,8 @@ const List<ApiValueDef> kCalibrations = [
   kS2Phase,
   kS2Invert,
   kS2Pga,
+  kAPga,
+  kBPga,
   ApiValueDef(
     category: _c,
     id: 0x50,

@@ -181,6 +181,24 @@ void main() {
       expect(id.build, equals('1371e8b0-dirty'));
     });
 
+    test('IDENTITY with api_minor (API 3.1) and without (3.0)', () {
+      final b = Uint8List(51)..[3] = 3;
+      b[50] = 1;
+      final id = ApiIdentity.decode(b)!;
+      expect(id.apiMinor, equals(1));
+      expect(id.apiVersionText, equals('3.1'));
+      expect(id.atLeast(3, 1), isTrue);
+      expect(id.atLeast(3, 2), isFalse);
+      // Firmware before 0.15.0: no minor byte, reads as 3.0.
+      final old = ApiIdentity.decode(Uint8List(50)..[3] = 3)!;
+      expect(old.apiMinor, equals(0));
+      expect(old.apiVersionText, equals('3.0'));
+      expect(old.atLeast(3, 1), isFalse);
+      // A payload longer than known is fine.
+      expect(ApiIdentity.decode(Uint8List(60)..[3] = 3..[50] = 2)!.apiMinor,
+          equals(2));
+    });
+
     test('a 27-byte IDENTITY (an old Leveltronic v2) does not decode', () {
       expect(ApiIdentity.decode(Uint8List(27)), isNull);
     });

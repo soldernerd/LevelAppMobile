@@ -28,6 +28,7 @@ class SimulatedDevice implements SimulatedPeripheral {
     Random? random,
     this.noise = 0.0,
     this.apiVersion = kApiVersion,
+    this.apiMinor = kApiMinor,
     this.latency = Duration.zero,
     DateTime Function()? clock,
   }) : _rng = random ?? Random(1),
@@ -40,6 +41,7 @@ class SimulatedDevice implements SimulatedPeripheral {
 
   /// Reported in IDENTITY. Tests set 2 to exercise the incompatibility path.
   final int apiVersion;
+  final int apiMinor;
 
   /// Artificial delay before each reply.
   final Duration latency;
@@ -348,7 +350,7 @@ class SimulatedDevice implements SimulatedPeripheral {
     switch (res) {
       case SysRes.identity:
         if (verb != ApiVerb.get) return _err(ApiStatus.verbNotValid);
-        final b = Uint8List(50);
+        final b = Uint8List(apiMinor == 0 ? 50 : 51);
         final bd = ByteData.sublistView(b);
         b[0] = 1;
         b[1] = 0;
@@ -358,6 +360,7 @@ class SimulatedDevice implements SimulatedPeripheral {
         _putStr(b, 6, 16, 'InclinationMeter');
         _putStr(b, 22, 8, '6DA08073');
         _putStr(b, 30, 20, '1371e8b0');
+        if (b.length > 50) b[50] = apiMinor;
         return _ok(b);
       case SysRes.state:
         return verb == ApiVerb.get

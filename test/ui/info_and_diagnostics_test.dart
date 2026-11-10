@@ -45,7 +45,7 @@ void main() {
       expect(find.text('6DA08073'), findsOneWidget);
       expect(find.text('InclinationMeter'), findsOneWidget);
       expect(find.text('1.0.0'), findsOneWidget);
-      expect(find.text('3'), findsOneWidget, reason: 'API version');
+      expect(find.text('3.1'), findsOneWidget, reason: 'API version');
       await tester.scrollUntilVisible(find.text('Uptime'), 300,
           scrollable: find.byType(Scrollable).first);
       expect(find.text('Uptime'), findsOneWidget);

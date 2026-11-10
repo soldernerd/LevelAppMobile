@@ -25,6 +25,12 @@ import 'dart:typed_data';
 /// The protocol version of the framing/opcode scheme. System IDENTITY reports it.
 const int kApiVersion = 3;
 
+/// The newest minor version of [kApiVersion] this app knows (API 3.1). A
+/// device with a lower minor works too and simply lacks the newer features; one
+/// with a higher minor works as well and its additions are not used. Only the
+/// major version decides compatibility.
+const int kApiMinor = 1;
+
 class ApiVerb {
   static const int get = 0x0;
   static const int set = 0x1;
@@ -267,8 +273,10 @@ String cString(Uint8List d, int start, int len) {
 // System
 // ---------------------------------------------------------------------------
 
-/// System IDENTITY. Two layouts share the opcode: the 50-byte v3 one
-/// (`fw[3] api_version max_payload product[16] serial[8] build[20]`) and the
+/// System IDENTITY. Two layouts share the opcode: the v3 one
+/// (`fw[3] api_version max_payload product[16] serial[8] build[20]`, 50 bytes,
+/// and since API 3.1 `api_minor` appended, 51; firmware before 0.15.0 sends no
+/// minor, which reads as 3.0) and the
 /// 19-byte v2 one (`fw[3] product[16]`) of devices still on API v2 such as the
 /// NeigMess2, which has no version field, serial or build; those decode with
 /// [apiVersion] 2 and an empty [serial] and [build].
@@ -278,6 +286,7 @@ class ApiIdentity {
     required this.fwMinor,
     required this.fwPatch,
     required this.apiVersion,
+    this.apiMinor = 0,
     required this.maxPayload,
     required this.product,
     required this.serial,
@@ -286,12 +295,22 @@ class ApiIdentity {
 
   final int fwMajor, fwMinor, fwPatch;
   final int apiVersion;
+
+  /// The minor part of the API version (0 when the device does not report one).
+  final int apiMinor;
   final int maxPayload;
   final String product;
   final String serial;
   final String build;
 
   String get firmware => '$fwMajor.$fwMinor.$fwPatch';
+
+  /// `3.1`
+  String get apiVersionText => '$apiVersion.$apiMinor';
+
+  /// Whether the device speaks at least API [major].[minor].
+  bool atLeast(int major, int minor) =>
+      apiVersion > major || (apiVersion == major && apiMinor >= minor);
 
   static ApiIdentity? decode(Uint8List d) {
     if (d.length == 19) {
@@ -313,6 +332,7 @@ class ApiIdentity {
       fwMinor: d[1],
       fwPatch: d[2],
       apiVersion: d[3],
+      apiMinor: d.length > 50 ? d[50] : 0,
       maxPayload: bd.getUint16(4, Endian.little),
       product: cString(d, 6, 16),
       serial: cString(d, 22, 8),

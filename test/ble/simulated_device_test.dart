@@ -20,6 +20,7 @@ void main() {
         final api = InstrumentApi(SimulatedDevice());
         final id = settle(async, api.verifyCompatible());
         expect(id.apiVersion, equals(3));
+        expect(id.apiVersionText, equals('3.1'));
         expect(id.serial, equals('6DA08073'));
       });
     });

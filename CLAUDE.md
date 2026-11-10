@@ -13,7 +13,7 @@ instrument (STM32G0B1 / RN4871). The scaffold was built mock-first (phases
 The firmware is `InclinationMeterFirmware` (repo also named "WylerLeveltronic").
 **Protocol:** its `docs/api-v3-spec.md`; **every resource:** its
 `docs/api-reference.md` (generated from `tools/api_spec.py`). The app speaks
-API v3 only — the Leveltronic driver refuses anything else
+API v3 only (3.1 is the newest minor it knows, `kApiMinor`; IDENTITY `api_minor` is absent on firmware before 0.15.0 and reads as 3.0 — only the major decides compatibility, `ApiIdentity.atLeast(3, n)` gates newer features) — the Leveltronic driver refuses anything else
 (`IncompatibleFirmwareException`, shown on the scan screen).
 
 - **Transport:** RN4871 **Transparent UART** — a raw byte stream carrying

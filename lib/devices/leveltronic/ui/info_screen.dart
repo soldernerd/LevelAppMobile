@@ -96,7 +96,7 @@ class InfoScreen extends ConsumerWidget {
               _Row('Serial', identity?.serial ?? '—'),
               _Row('Firmware', identity?.firmware ?? '—'),
               _Row('Build', identity?.build ?? '—'),
-              _Row('API version', identity == null ? '—' : '${identity.apiVersion}'),
+              _Row('API version', identity == null ? '—' : identity.apiVersionText),
             ]),
             _Group('Activity', [
               _Row('Tilt measurement running', _yesNo(status?.demodRunning)),

@@ -7,6 +7,7 @@ import 'package:inclinometer/devices/neigmess2/protocol.dart';
 import 'package:inclinometer/devices/neigmess2/providers/neigmess_provider.dart';
 import 'package:inclinometer/devices/neigmess2/ui/actions.dart';
 import 'package:inclinometer/providers/device_provider.dart';
+import 'package:inclinometer/ui/device_name.dart';
 import 'package:inclinometer/ui/device_switcher.dart';
 
 /// The NeigMess2 live screen: the tilt of the centre sensor in large type
@@ -27,7 +28,7 @@ class NeigMessScreen extends ConsumerWidget {
         backgroundColor: const Color(0xFF121212),
         appBar: AppBar(
           backgroundColor: const Color(0xFF1E1E1E),
-          title: const Text('NeigMess2', style: TextStyle(fontSize: 18)),
+          title: const DeviceTitle(fallback: 'NeigMess2'),
           actions: [
             const DeviceSwitcherButton(),
             PopupMenuButton<String>(
@@ -44,6 +45,10 @@ class NeigMessScreen extends ConsumerWidget {
                 PopupMenuItem(value: 'zero', child: Text('Zero sensors')),
                 PopupMenuItem(value: 'clear', child: Text('Clear zero')),
                 PopupMenuDivider(),
+                PopupMenuItem(
+                  value: 'rename',
+                  child: Text('Name this instrument…'),
+                ),
                 PopupMenuItem(value: 'disconnect', child: Text('Disconnect')),
               ],
             ),
@@ -80,6 +85,9 @@ class NeigMessScreen extends ConsumerWidget {
     final session = ref.read(neigmessSessionProvider);
     if (session == null) return;
     switch (v) {
+      case 'rename':
+        showRenameDialog(context, ref,
+            id: session.id, technical: session.label);
       case 'flip':
         context.push('/neigmess2/zero');
       case 'calibration':

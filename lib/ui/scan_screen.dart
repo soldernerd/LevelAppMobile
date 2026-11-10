@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:inclinometer/config/build_flavor.dart';
 import 'package:inclinometer/models/connection.dart';
+import 'package:inclinometer/providers/device_names_provider.dart';
 import 'package:inclinometer/providers/device_provider.dart';
+import 'package:inclinometer/ui/device_name.dart';
 import 'package:inclinometer/providers/update_provider.dart';
 import 'package:inclinometer/providers/version_provider.dart';
 import 'package:inclinometer/services/update_service.dart';
@@ -191,7 +193,7 @@ class ScanScreen extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (devices.isNotEmpty) _buildDeviceList(ref, devices),
+              if (devices.isNotEmpty) _buildDeviceList(context, ref, devices),
               const SizedBox(height: 16),
               Text(
                 ref.watch(connectionErrorProvider) ??
@@ -227,7 +229,7 @@ class ScanScreen extends ConsumerWidget {
       );
     }
 
-    return _buildDeviceList(ref, devices);
+    return _buildDeviceList(context, ref, devices);
   }
 
   Widget _buildOpenDevices(
@@ -235,6 +237,7 @@ class ScanScreen extends ConsumerWidget {
     WidgetRef ref,
     OpenSessions open,
   ) {
+    final names = ref.watch(deviceNamesProvider);
     return Column(
       children: [
         for (final s in open.all)
@@ -244,26 +247,47 @@ class ScanScreen extends ConsumerWidget {
             leading: const Icon(Icons.bluetooth_connected,
                 color: Colors.white70, size: 20),
             title: Text(
-              s.label,
+              names[s.id] ?? s.label,
               style: const TextStyle(fontSize: 16, color: Colors.white),
             ),
+            subtitle: names[s.id] == null
+                ? null
+                : Text(s.label,
+                    style:
+                        const TextStyle(fontSize: 12, color: Colors.white54)),
             onTap: () {
               ref.read(sessionsProvider.notifier).activate(s.id);
               context.go(s.driver.homeLocation);
             },
-            trailing: IconButton(
-              tooltip: 'Disconnect',
-              icon: const Icon(Icons.link_off, size: 20),
-              onPressed: () => ref
-                  .read(connectionNotifierProvider.notifier)
-                  .disconnect(deviceId: s.id),
+            onLongPress: () => showRenameDialog(context, ref,
+                id: s.id, technical: s.label),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  key: ValueKey('rename-${s.id}'),
+                  tooltip: 'Name this instrument',
+                  icon: const Icon(Icons.edit, size: 20),
+                  onPressed: () => showRenameDialog(context, ref,
+                      id: s.id, technical: s.label),
+                ),
+                IconButton(
+                  tooltip: 'Disconnect',
+                  icon: const Icon(Icons.link_off, size: 20),
+                  onPressed: () => ref
+                      .read(connectionNotifierProvider.notifier)
+                      .disconnect(deviceId: s.id),
+                ),
+              ],
             ),
           ),
       ],
     );
   }
 
-  Widget _buildDeviceList(WidgetRef ref, List<ScannedDevice> devices) {
+  Widget _buildDeviceList(
+      BuildContext context, WidgetRef ref, List<ScannedDevice> devices) {
+    final names = ref.watch(deviceNamesProvider);
     return ListView.builder(
       itemCount: devices.length,
       itemBuilder: (context, index) {
@@ -276,9 +300,15 @@ class ScanScreen extends ConsumerWidget {
             size: 20,
           ),
           title: Text(
-            device.name,
+            names[device.id] ?? device.name,
             style: const TextStyle(fontSize: 16, color: Colors.white),
           ),
+          subtitle: names[device.id] == null
+              ? null
+              : Text(device.name,
+                  style: const TextStyle(fontSize: 12, color: Colors.white54)),
+          onLongPress: () => showRenameDialog(context, ref,
+              id: device.id, technical: device.name),
           trailing: Text(
             '${device.rssi} dBm',
             style: const TextStyle(fontSize: 13, color: Colors.white70),

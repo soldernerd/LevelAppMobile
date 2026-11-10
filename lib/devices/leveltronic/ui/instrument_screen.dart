@@ -9,6 +9,7 @@ import 'package:inclinometer/devices/leveltronic/precision_run.dart';
 import 'package:inclinometer/devices/leveltronic/protocol.dart';
 import 'package:inclinometer/providers/device_provider.dart';
 import 'package:inclinometer/devices/leveltronic/providers/leveltronic_provider.dart';
+import 'package:inclinometer/ui/device_name.dart';
 import 'package:inclinometer/ui/device_switcher.dart';
 import 'package:inclinometer/devices/leveltronic/providers/tare_provider.dart';
 import 'package:inclinometer/devices/leveltronic/ui/precision_sheet.dart';
@@ -44,7 +45,7 @@ class InstrumentScreen extends ConsumerWidget {
       backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('Leveltronic', style: TextStyle(fontSize: 18)),
+        title: const DeviceTitle(fallback: 'Leveltronic'),
         actions: [
           if (d?.onboardTempC != null) ...[
             const Icon(Icons.thermostat, size: 18, color: Colors.white54),
@@ -83,6 +84,7 @@ class InstrumentScreen extends ConsumerWidget {
               PopupMenuItem(value: 'info', child: Text('All values')),
               PopupMenuItem(value: 'diagnostics', child: Text('Diagnostics')),
               PopupMenuItem(value: 'scope', child: Text('Oscilloscope')),
+              PopupMenuItem(value: 'rename', child: Text('Name this instrument…')),
               PopupMenuDivider(),
               PopupMenuItem(value: 'disconnect', child: Text('Disconnect')),
             ],
@@ -229,6 +231,11 @@ class InstrumentScreen extends ConsumerWidget {
         context.push('/leveltronic/diagnostics');
       case 'scope':
         context.push('/leveltronic/scope');
+      case 'rename':
+        final s = ref.read(activeSessionProvider);
+        if (s != null) {
+          showRenameDialog(context, ref, id: s.id, technical: s.label);
+        }
       case 'disconnect':
         ref.read(connectionNotifierProvider.notifier).disconnect();
     }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:inclinometer/devices/device_driver.dart';
+import 'package:inclinometer/providers/device_names_provider.dart';
 import 'package:inclinometer/providers/device_provider.dart';
 
 /// Wraps a driver's home screen: when the active device changes — it was
@@ -32,6 +33,7 @@ class DeviceSwitcherButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final open = ref.watch(sessionsProvider);
+    final names = ref.watch(deviceNamesProvider);
     return PopupMenuButton<Object>(
       key: const ValueKey('device-switcher'),
       tooltip: 'Devices',
@@ -48,7 +50,9 @@ class DeviceSwitcherButton extends ConsumerWidget {
           CheckedPopupMenuItem<Object>(
             value: s,
             checked: s.id == open.activeId,
-            child: Text(s.label),
+            child: Text(names[s.id] == null
+                ? s.label
+                : '${names[s.id]} · ${s.label}'),
           ),
         const PopupMenuDivider(),
         const PopupMenuItem<Object>(value: 'add', child: Text('Add device…')),

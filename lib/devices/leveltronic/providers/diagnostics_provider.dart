@@ -10,9 +10,9 @@ final signalDiagProvider = StreamProvider.autoDispose<ApiSignalDiag>((ref) {
   return ref.watch(instrumentApiProvider).signalDiagUpdates(intervalMs: 500);
 });
 
-/// The ADC PGA gain of S1 and S2 (index 0 = S1, 1 = S2), read once per visit;
-/// null where it cannot be read.
-final sensorPgaProvider = FutureProvider.autoDispose<List<int?>>((ref) async {
+/// The ADC PGA gain of each channel ch0..ch3 (S2, B, A, S1), read once per
+/// visit; null where it cannot be read.
+final channelPgaProvider = FutureProvider.autoDispose<List<int?>>((ref) async {
   final api = ref.watch(instrumentApiProvider);
   return [for (final d in kChannelPga) await api.tryReadValue(d)];
 });

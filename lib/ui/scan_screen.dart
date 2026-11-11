@@ -23,7 +23,7 @@ bool _blePermissionsRequested = false;
 ///
 /// File-scope bool (mirrors [_blePermissionsRequested]) — prevents duplicate
 /// dialogs when the updateCheckProvider rebuilds or the widget rebuilds while
-/// the dialog is already on screen (T-07-08 DoS mitigation from threat model).
+/// the dialog is already on screen.
 bool _updateDialogShown = false;
 
 /// Resets [_updateDialogShown] to false between widget tests.
@@ -35,7 +35,7 @@ void resetUpdateDialogShownForTest() => _updateDialogShown = false;
 /// Root scan screen — shown on app launch.
 ///
 /// Displays scan state chip, a FAB to start/stop scanning, and a filtered list
-/// of discovered BLE devices (unnamed devices are hidden per SCAN-03).
+/// of discovered BLE devices (unnamed devices are hidden).
 /// Navigates to the new device's home (its driver's route) via go_router when
 /// [connectionNotifierProvider] reaches [ConnectionStatus.connected]. Devices
 /// that are already open are listed on top; scanning again adds more.
@@ -50,13 +50,13 @@ class ScanScreen extends ConsumerWidget {
         .where((d) => d.name.isNotEmpty && !open.contains(d.id))
         .toList();
 
-    // Watch permanently-denied state for inline banner (D-02).
+    // Permanently-denied state, for the inline banner.
     final permanentlyDenied = ref.watch(blePermissionPermanentlyDeniedProvider);
 
     // Version string stamped by the build system — empty while loading.
     final version = ref.watch(versionProvider).asData?.value ?? '';
 
-    // Navigate to the active device's home via go_router on connect (RESEARCH.md Pitfall 4).
+    // Navigate to the active device's home via go_router on connect.
     // Guard: prev != connected prevents duplicate navigation when provider
     // rebuilds while already connected (e.g. scan-revision increment).
     ref.listen(connectionNotifierProvider, (prev, next) {
@@ -68,9 +68,9 @@ class ScanScreen extends ConsumerWidget {
       }
     });
 
-    // UPD-02: React to the cold-start update check result.
+    // React to the cold-start update check result.
     // ref.listen (not ref.watch) so the widget does not rebuild on state change.
-    // addPostFrameCallback defers showDialog out of the build phase (Pitfall 2).
+    // addPostFrameCallback defers showDialog out of the build phase.
     // _updateDialogShown guard prevents duplicate dialogs on provider rebuild.
     // Skipped entirely on Play builds — kSelfUpdateEnabled is a compile-time
     // const, so the dialog code tree-shakes out of the release binary.
@@ -90,7 +90,7 @@ class ScanScreen extends ConsumerWidget {
       );
     }
 
-    // D-01: Show rationale dialog before system permission prompt on first render.
+    // Show the rationale dialog before the system permission prompt on first render.
     // addPostFrameCallback ensures we are outside the build phase when showing
     // a dialog.
     if (!_blePermissionsRequested) {
@@ -102,7 +102,7 @@ class ScanScreen extends ConsumerWidget {
 
     final isScanning = status == ConnectionStatus.scanning;
 
-    // FAB is hidden when connecting/connected/disconnecting/reconnecting.
+    // The FAB is hidden while connecting or disconnecting.
     final showFab = status == ConnectionStatus.idle ||
         status == ConnectionStatus.disconnected ||
         status == ConnectionStatus.scanning ||
@@ -140,15 +140,13 @@ class ScanScreen extends ConsumerWidget {
               tooltip: isScanning ? 'Stop Scan' : 'Start Scan',
               onPressed: isScanning
                   ? () async {
-                      // ConnectionNotifier.stopScan() catches errors and sets
-                      // state = ConnectionStatus.error internally (WR-02).
+                      // stopScan() catches errors and sets the error status itself.
                       await ref
                           .read(connectionNotifierProvider.notifier)
                           .stopScan();
                     }
                   : () async {
-                      // ConnectionNotifier.startScan() catches errors and sets
-                      // state = ConnectionStatus.error internally (WR-02).
+                      // startScan() catches errors and sets the error status itself.
                       await ref
                           .read(connectionNotifierProvider.notifier)
                           .startScan();
@@ -156,7 +154,6 @@ class ScanScreen extends ConsumerWidget {
               child: Icon(isScanning ? Icons.stop : Icons.bluetooth_searching),
             )
           : null,
-      // D-02: Conditionally show permanently-denied banner above body.
       body: Column(
         children: [
           if (permanentlyDenied) _buildPermissionDeniedBanner(),
@@ -187,24 +184,22 @@ class ScanScreen extends ConsumerWidget {
     List<ScannedDevice> devices,
   ) {
     if (status == ConnectionStatus.error) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (devices.isNotEmpty) _buildDeviceList(context, ref, devices),
-              const SizedBox(height: 16),
-              Text(
-                ref.watch(connectionErrorProvider) ??
-                    'Could not start scan. Check Bluetooth is enabled.',
-                key: const ValueKey('scan-error'),
-                style: const TextStyle(fontSize: 13, color: Colors.white70),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+      final message = Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text(
+          ref.watch(connectionErrorProvider) ??
+              'Could not start scan. Check Bluetooth is enabled.',
+          key: const ValueKey('scan-error'),
+          style: const TextStyle(fontSize: 13, color: Colors.white70),
+          textAlign: TextAlign.center,
         ),
+      );
+      if (devices.isEmpty) return Center(child: message);
+      return Column(
+        children: [
+          message,
+          Expanded(child: _buildDeviceList(context, ref, devices)),
+        ],
       );
     }
 
@@ -314,8 +309,7 @@ class ScanScreen extends ConsumerWidget {
             style: const TextStyle(fontSize: 13, color: Colors.white70),
           ),
           onTap: () async {
-            // ConnectionNotifier.connect() catches errors and sets
-            // state = ConnectionStatus.error internally (WR-02).
+            // connect() catches errors and sets the error status itself.
             await ref
                 .read(connectionNotifierProvider.notifier)
                 .connect(device.id);
@@ -358,7 +352,7 @@ class _DemoTile extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Permission helpers (D-01, D-02)
+// Permission helpers
 // ---------------------------------------------------------------------------
 
 /// Requests BLE permissions on Android with a rationale dialog shown first.
@@ -385,7 +379,7 @@ Future<void> _requestBlePermissionsIfNeeded(
   final statuses = await Future.wait(permissions.map((p) => p.status));
   if (statuses.every((s) => s.isGranted)) return;
 
-  // Show rationale dialog before the system prompt (PERM-03).
+  // Show the rationale dialog before the system prompt.
   if (!context.mounted) return;
   await showDialog<void>(
     context: context,
@@ -411,11 +405,11 @@ Future<void> _requestBlePermissionsIfNeeded(
   final anyPermanentlyDenied =
       results.values.any((s) => s.isPermanentlyDenied);
   if (anyPermanentlyDenied) {
-    ref.read(blePermissionPermanentlyDeniedProvider.notifier).state = true;
+    ref.read(blePermissionPermanentlyDeniedProvider.notifier).set(true);
   }
 }
 
-/// Inline banner shown when BLE permissions are permanently denied (D-02).
+/// Inline banner shown when BLE permissions are permanently denied.
 ///
 /// Background: Color(0xFF311B1B) — dark red tint to indicate a blocking state.
 Widget _buildPermissionDeniedBanner() {
@@ -441,20 +435,19 @@ Widget _buildPermissionDeniedBanner() {
 }
 
 // ---------------------------------------------------------------------------
-// Update dialog (UPD-02, UPD-03, D-03/D-04)
+// Update dialog
 // ---------------------------------------------------------------------------
 
 /// Shows a one-time dialog when a newer GitHub release is available.
 ///
 /// Presents [info.version] to the user with two actions:
 /// - **Skip** — persists the tag via [UpdateService.skipVersion] so the dialog
-///   never re-appears for this release (D-03/D-04), then dismisses.
+///   never re-appears for this release, then dismisses.
 /// - **Update** — downloads the APK with a live [LinearProgressIndicator] then
-///   launches the Android package installer (UPD-03).
+///   launches the Android package installer.
 ///
-/// All errors during download/install are swallowed (fail-quiet posture, UPD-05).
-/// No platform/HTTP imports are used here — all I/O stays in [UpdateService]
-/// per the CLAUDE.md ARCH-02 architecture boundary.
+/// All errors during download/install are swallowed (fail quiet). No
+/// platform/HTTP imports are used here — all I/O stays in [UpdateService].
 Future<void> _showUpdateDialog(
   BuildContext context,
   WidgetRef ref,
@@ -507,7 +500,7 @@ Future<void> _showUpdateDialog(
           actions: [
             TextButton(
               onPressed: () async {
-                // D-03/D-04: persist skip so this version never re-prompts.
+                // Persist the skip so this version never re-prompts.
                 await UpdateService.skipVersion(info.tagName);
                 if (ctx.mounted) Navigator.of(ctx).pop();
               },
@@ -526,7 +519,7 @@ Future<void> _showUpdateDialog(
                   );
                   await UpdateService.installApk(path);
                 } catch (_) {
-                  // UPD-05: fail-quiet — close dialog silently on any error.
+                  // Fail quiet: close the dialog silently on any error.
                 } finally {
                   dialogStillOpen = false;
                   if (ctx.mounted) Navigator.of(ctx).pop();
@@ -562,8 +555,6 @@ Color _chipColor(ConnectionStatus status) {
       return const Color(0xFFFFA000);
     case ConnectionStatus.connected:
       return const Color(0xFF43A047);
-    case ConnectionStatus.reconnecting:
-      return const Color(0xFFF57F17);
     case ConnectionStatus.disconnecting:
       return const Color(0xFFD32F2F);
     case ConnectionStatus.disconnected:
@@ -583,8 +574,6 @@ String _chipLabel(ConnectionStatus status) {
       return 'Connecting…';
     case ConnectionStatus.connected:
       return 'Connected';
-    case ConnectionStatus.reconnecting:
-      return 'Reconnecting…';
     case ConnectionStatus.disconnecting:
       return 'Disconnecting…';
     case ConnectionStatus.disconnected:

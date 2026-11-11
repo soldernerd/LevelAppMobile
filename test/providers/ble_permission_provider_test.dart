@@ -17,14 +17,9 @@ void main() {
 
       container
           .read(blePermissionPermanentlyDeniedProvider.notifier)
-          .state = true;
+          .set(true);
 
       expect(container.read(blePermissionPermanentlyDeniedProvider), true);
-    });
-
-    test('is importable from device_provider.dart', () {
-      // The provider reference itself confirms importability at compile time.
-      expect(blePermissionPermanentlyDeniedProvider, isNotNull);
     });
   });
 }

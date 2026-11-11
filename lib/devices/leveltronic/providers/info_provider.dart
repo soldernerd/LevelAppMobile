@@ -4,14 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:inclinometer/ble/api_v3.dart';
 import 'package:inclinometer/devices/leveltronic/protocol.dart';
-import 'package:inclinometer/providers/device_provider.dart';
 import 'package:inclinometer/devices/leveltronic/providers/leveltronic_provider.dart';
 
-/// Identity (firmware, serial, build) of the connected instrument.
-final identityProvider = FutureProvider.autoDispose<ApiIdentity>((ref) {
-  // Re-read when the connection changes (a different instrument).
-  ref.watch(connectionNotifierProvider);
-  return ref.watch(instrumentApiProvider).identity();
+/// Identity (firmware, serial, build) of the active Leveltronic, as read when
+/// it connected; null when there is none. It follows the active device.
+final identityProvider = Provider<ApiIdentity?>((ref) {
+  return ref.watch(leveltronicSessionProvider)?.identity;
 });
 
 /// A value together with the phone time it was read at.

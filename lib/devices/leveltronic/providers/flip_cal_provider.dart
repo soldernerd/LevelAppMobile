@@ -3,23 +3,10 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:inclinometer/devices/leveltronic/api_catalog.dart';
+import 'package:inclinometer/devices/leveltronic/calibration/sensor_mask.dart';
 import 'package:inclinometer/devices/leveltronic/protocol.dart';
 import 'package:inclinometer/ble/device_link.dart';
 import 'package:inclinometer/devices/leveltronic/providers/leveltronic_provider.dart';
-
-/// Which sensors a calibration run covers: bit0 S1, bit1 S2.
-class SensorMask {
-  static const s1 = 1;
-  static const s2 = 2;
-  static const both = 3;
-
-  static bool has(int mask, int sensorIndex) => mask & (1 << sensorIndex) != 0;
-  static String label(int mask) => switch (mask) {
-        s1 => 'S1',
-        s2 => 'S2',
-        _ => 'S1 and S2',
-      };
-}
 
 /// Calibration values of the two sensors at one moment.
 class ZeroSnapshot {

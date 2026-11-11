@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:inclinometer/ble/api_v3.dart';
+import 'package:inclinometer/ble/device_link.dart';
 import 'package:inclinometer/devices/leveltronic/protocol.dart';
 import 'package:inclinometer/devices/leveltronic/providers/diagnostics_provider.dart';
 import 'package:inclinometer/devices/leveltronic/ui/widgets/format.dart';
@@ -18,7 +20,7 @@ class DiagnosticsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final diag = ref.watch(signalDiagProvider);
-    final pga = ref.watch(sensorPgaProvider).value;
+    final pga = ref.watch(channelPgaProvider).value;
     final stored = ref.watch(sensorPhaseProvider).value;
 
     return Scaffold(
@@ -34,7 +36,7 @@ class DiagnosticsScreen extends ConsumerWidget {
             child: Padding(
               padding: const EdgeInsets.all(24),
               child: Text(
-                e is Exception && e.toString().contains('unknownResource')
+                e is ApiException && e.status == ApiStatus.unknownResource
                     ? 'This firmware has no signal diagnostics.'
                     : 'Could not read the diagnostics.',
                 textAlign: TextAlign.center,

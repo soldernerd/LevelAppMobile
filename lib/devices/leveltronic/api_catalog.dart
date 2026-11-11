@@ -388,8 +388,6 @@ const List<ApiValueDef> kSensorK = [kS1K, kS2K];
 const List<ApiValueDef> kSensorZero = [kS1Zero, kS2Zero];
 const List<ApiValueDef> kSensorPhase = [kS1Phase, kS2Phase];
 const List<ApiValueDef> kSensorInvert = [kS1Invert, kS2Invert];
-const List<ApiValueDef> kSensorPga = [kS1Pga, kS2Pga];
-
 /// The PGA of each ADC channel ch0..ch3 (S2, B, A, S1).
 const List<ApiValueDef> kChannelPga = [kS2Pga, kBPga, kAPga, kS1Pga];
 

@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:inclinometer/devices/leveltronic/calibration/calibration_math.dart';
-import 'package:inclinometer/devices/leveltronic/providers/flip_cal_provider.dart' show SensorMask;
+import 'package:inclinometer/devices/leveltronic/calibration/sensor_mask.dart';
 import 'package:inclinometer/devices/leveltronic/providers/phase_cal_provider.dart';
 import 'package:inclinometer/devices/leveltronic/providers/service_provider.dart';
 import 'package:inclinometer/devices/leveltronic/ui/widgets/format.dart';
@@ -164,13 +164,11 @@ class PhaseCalScreen extends ConsumerWidget {
         );
 
       case PhaseStage.review:
-        final applicable = [
-          for (var i = 0; i < 2; i++)
-            SensorMask.has(s.mask, i) &&
-                s.estimates[i] != null &&
-                s.estimates[i]!.inRange,
-        ];
-        final canApply = service && applicable.any((a) => a);
+        final canApply = service &&
+            [
+              for (var i = 0; i < 2; i++)
+                SensorMask.has(s.mask, i) && s.estimates[i] != null,
+            ].any((a) => a);
         return WizardScaffold(
           title: _title,
           children: [
@@ -349,10 +347,6 @@ class _EstimateCard extends StatelessWidget {
     if (e == null) {
       color = const Color(0xFFE53935);
       verdict = 'No usable signal was seen. Use a larger shim and redo.';
-    } else if (!e.inRange) {
-      color = const Color(0xFFE53935);
-      verdict = 'The phase is outside ±180°. Check sensor cabling '
-          'and orientation.';
     } else if (!e.confident) {
       color = const Color(0xFFFFA000);
       verdict = 'Low confidence — a larger tilt or a quieter table would '

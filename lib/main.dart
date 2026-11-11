@@ -10,9 +10,9 @@ import 'package:inclinometer/devices/neigmess2/neigmess_driver.dart';
 import 'package:inclinometer/providers/device_provider.dart';
 import 'package:inclinometer/router.dart';
 
-// WR-02: Dispose _container when the app process is torn down by the OS.
-// WidgetsBindingObserver is the only reliable hook that fires on detach
-// (process exit / task-swipe on Android) — the isolate can still run briefly.
+// Disposes the container (and with it every open device connection) when the
+// OS tears the app down. `detached` is the only reliable hook for that
+// (process exit / task swipe on Android); the isolate can still run briefly.
 class _AppLifecycleObserver extends WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -25,10 +25,8 @@ class _AppLifecycleObserver extends WidgetsBindingObserver {
 // The devices this build supports: one driver per device family.
 final _registry = DeviceRegistry(const [LeveltronicDriver(), NeigMessDriver()]);
 
-// The single place the concrete BLE implementation is chosen. Swap in
-// MockBleManager.demo() here to drive the UI with a simulated instrument
-// (service mode can be flipped from the debug-only menu entry in a test).
-// All overrides live on _container — ProviderScope uses parent: _container.
+// The single place the concrete BLE implementation is chosen. (The scan
+// screen's "Open demo instrument" tile brings a MockBleManager of its own.)
 final _container = ProviderContainer(
   overrides: [
     bleManagerProvider.overrideWithValue(RealBleManager()),
@@ -43,17 +41,15 @@ final _router = buildRouter(
 );
 
 Future<void> main() async {
-  // RESEARCH.md Pitfall 2: WidgetsFlutterBinding.ensureInitialized() must be
-  // called before any platform channel calls (e.g. permission_handler).
+  // Must run before any platform channel call (permission_handler below).
   WidgetsFlutterBinding.ensureInitialized();
 
-  // WR-02: Register lifecycle observer so _container is disposed on app detach.
   WidgetsBinding.instance.addObserver(_AppLifecycleObserver());
 
-  // D-01: Cold-start check — detect permanently denied BLE permissions on Android.
-  // Writes result to _container so ScanScreen can read it immediately on first build.
-  // CR-01 fix: check .status first; isPermanentlyDenied returns true on fresh installs
-  // if called directly without first reading .status (permission_handler behaviour).
+  // Cold start: detect permanently denied BLE permissions on Android, so the
+  // scan screen can show its banner on the first build. Read .status first:
+  // isPermanentlyDenied is true on a fresh install if asked on its own
+  // (permission_handler behaviour).
   if (Platform.isAndroid) {
     final scanStatus = await Permission.bluetoothScan.status;
     final connectStatus = await Permission.bluetoothConnect.status;
@@ -63,20 +59,17 @@ Future<void> main() async {
         !connectStatus.isGranted;
     _container
         .read(blePermissionPermanentlyDeniedProvider.notifier)
-        .state = permanentlyDenied;
+        .set(permanentlyDenied);
   }
 
   runApp(
-    // RESEARCH.md Pitfall 3: use UncontrolledProviderScope to inject the
-    // pre-configured _container directly — do NOT use ProviderScope(overrides:)
-    // since overrides (MockBleManager) are already declared on _container above.
-    // D-07: ProviderContainer carries bleManagerProvider override; ProviderScope
-    // uses parent: _container (implemented via UncontrolledProviderScope).
+    // UncontrolledProviderScope injects the pre-built container; a plain
+    // ProviderScope(overrides: ...) would create a second one.
     UncontrolledProviderScope(
       container: _container,
       child: MaterialApp.router(
         title: 'Leveltronic',
-        // D-05: dark theme only — no light/adaptive theme.
+        // Dark theme only.
         theme: ThemeData.dark(),
         debugShowCheckedModeBanner: false,
         routerConfig: _router,

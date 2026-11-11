@@ -10,7 +10,7 @@ import 'package:inclinometer/devices/leveltronic/precision_run.dart';
 import 'package:inclinometer/devices/leveltronic/calibration/calibration_math.dart';
 import 'package:inclinometer/devices/leveltronic/providers/info_provider.dart';
 import 'package:inclinometer/devices/leveltronic/providers/leveltronic_provider.dart';
-import 'package:inclinometer/devices/leveltronic/providers/flip_cal_provider.dart' show SensorMask;
+import 'package:inclinometer/devices/leveltronic/calibration/sensor_mask.dart';
 
 enum GainStage {
   /// Choose the sensors and the known tilt step.
@@ -134,19 +134,9 @@ class GainCalNotifier extends Notifier<GainCalState> {
       _run = null;
       if (r != null) unawaited(r.cancel());
     });
-    // Use ref.listen (not ref.watch) so identity resolving doesn't rebuild
-    // and reset wizard state mid-calibration.
-    ref.listen(
-      identityProvider,
-      (_, next) {
-        final serial = next.asData?.value.serial;
-        if (serial != null && serial != _serial) {
-          _serial = serial;
-          _loadShim(serial);
-        }
-      },
-      fireImmediately: true,
-    );
+    final serial = ref.watch(identityProvider)?.serial;
+    _serial = serial;
+    if (serial != null) unawaited(_loadShim(serial));
     Future(refreshValues);
     return const GainCalState();
   }
@@ -204,8 +194,12 @@ class GainCalNotifier extends Notifier<GainCalState> {
     try {
       final prefs = await SharedPreferences.getInstance();
       for (var i = 0; i < 2; i++) {
-        await prefs.setDouble(_keyHeight(serial, i), state.shimHeightMm[i]);
-        await prefs.setDouble(_keyBaseline(serial, i), state.baselineMm[i]);
+        // A cleared or half-typed field reads as 0; that is not a setup worth
+        // keeping for the next visit.
+        final h = state.shimHeightMm[i], b = state.baselineMm[i];
+        if (h <= 0 || b <= 0) continue;
+        await prefs.setDouble(_keyHeight(serial, i), h);
+        await prefs.setDouble(_keyBaseline(serial, i), b);
       }
     } catch (_) {}
   }
@@ -236,9 +230,17 @@ class GainCalNotifier extends Notifier<GainCalState> {
     final reading =
         await _measure(GainStage.measuringShim, GainStage.shim);
     if (reading == null) return;
+    final gen = _gen;
     final base = state.baselineReading!;
     final tilted = [reading.tiltS1, reading.tiltS2];
-    final k = state.currentK ?? await _readK();
+    final List<int> k;
+    try {
+      k = state.currentK ?? await _readK();
+    } catch (e) {
+      _fail(gen, e);
+      return;
+    }
+    if (gen != _gen) return;
     final est = [
       for (var i = 0; i < 2; i++)
         estimateGain(

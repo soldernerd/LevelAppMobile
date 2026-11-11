@@ -12,7 +12,7 @@ class TareNotifier extends Notifier<double?> {
 
   @override
   double? build() {
-    final serial = ref.watch(identityProvider).asData?.value.serial;
+    final serial = ref.watch(identityProvider)?.serial;
     _serial = serial;
     if (serial != null) _load(serial);
     return null;

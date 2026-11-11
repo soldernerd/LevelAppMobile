@@ -60,7 +60,6 @@ void main() {
             positive: capture(0.1, phaseDeg: truth, seed: 1),
             negative: capture(-0.1, phaseDeg: truth, seed: 2))!;
         expect(wrapDegrees(e.angleDeg - truth).abs(), lessThan(0.1));
-        expect(e.inRange, isTrue);
         expect(e.confident, isTrue);
         expect(e.singleSided, isFalse);
       });

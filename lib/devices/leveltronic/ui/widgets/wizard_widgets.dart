@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:inclinometer/devices/leveltronic/providers/flip_cal_provider.dart' show SensorMask;
+import 'package:inclinometer/devices/leveltronic/calibration/sensor_mask.dart';
 
 /// Choose S1, S2 or both.
 class SensorSelector extends StatelessWidget {

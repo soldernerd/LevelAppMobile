@@ -34,7 +34,7 @@ void main() {
   // routed through the test messenger rather than throwing binding errors.
   setUpAll(TestWidgetsFlutterBinding.ensureInitialized);
 
-  group('instrumentDataProvider — stale data sentinel (CONN-05)', () {
+  group('instrumentDataProvider — stale data sentinel', () {
     test('emits DeviceState values while connected', () {
       fakeAsync((async) {
         final mock = MockBleManager(random: Random(0));
@@ -107,7 +107,7 @@ void main() {
     });
   });
 
-  group('SYS-01 — wakelock side-effects (observable via state transitions)', () {
+  group('wakelock side-effects (observable via state transitions)', () {
     test('connected state is reached when connect() resolves', () {
       fakeAsync((async) {
         final mock = MockBleManager(random: Random(0));
@@ -123,7 +123,7 @@ void main() {
           container.read(connectionNotifierProvider),
           equals(ConnectionStatus.connected),
         );
-        // WakelockPlus.enable() is called in this transition per D-09/SYS-01.
+        // WakelockPlus.enable() is called in this transition.
         // Platform side-effect is verified by code inspection (RESEARCH.md: static API,
         // platform behavior trusted). State reaching connected is the observable proxy.
       });
@@ -147,7 +147,7 @@ void main() {
           container.read(connectionNotifierProvider),
           equals(ConnectionStatus.disconnected),
         );
-        // WakelockPlus.disable() is called in this transition per D-09/SYS-01.
+        // WakelockPlus.disable() is called in this transition.
       });
     });
   });

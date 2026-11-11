@@ -25,9 +25,6 @@ class LiveFeed {
   /// The last merged state.
   DeviceState get state => _state;
 
-  /// Called once when the link goes down (a subscription stream completed).
-  void Function()? onLinkDown;
-
   void start() {
     if (_started) return;
     _started = true;
@@ -35,7 +32,6 @@ class LiveFeed {
     _subs.add(api.liveUpdates().listen(
           (v) => _update(_state.copyWith(live: v)),
           onError: _ignore,
-          onDone: _linkDown,
         ));
     _subs.add(api.statusUpdates().listen(
           _onStatus,
@@ -84,14 +80,7 @@ class LiveFeed {
 
   void _ignore(Object _) {}
 
-  void _linkDown() {
-    final cb = onLinkDown;
-    onLinkDown = null;
-    cb?.call();
-  }
-
   Future<void> stop() async {
-    onLinkDown = null;
     for (final s in _subs) {
       unawaited(s.cancel());
     }

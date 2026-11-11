@@ -1,9 +1,7 @@
-// lib/services/update_service.dart
-// GitHub Releases self-update service.
+// GitHub Releases self-update service (sideload flavor only).
 //
-// All platform I/O (HTTP, file, permissions, installer) is isolated here per
-// CLAUDE.md architecture constraints — no flutter_blue_plus or platform SDK
-// imports allowed in lib/ui/ or lib/providers/.
+// All platform I/O (HTTP, file, permissions, installer) is isolated here —
+// no platform SDK imports in lib/ui/ or lib/providers/.
 
 import 'dart:convert';
 import 'dart:io';
@@ -41,14 +39,13 @@ class UpdateInfo {
 
 /// Service layer for GitHub Releases self-update.
 ///
-/// All methods are static — no instance state. Follows the [StatePacket.parse]
-/// static service convention established in lib/ble/ble_protocol.dart.
+/// All methods are static — no instance state.
 class UpdateService {
   /// Checks whether a newer GitHub release is available.
   ///
   /// Returns an [UpdateInfo] when a newer, non-skipped release with the
   /// expected APK asset exists.  Returns null when up-to-date, already
-  /// skipped, or on any network/parse error (D-01: silent fail, UPD-05).
+  /// skipped, or on any network/parse error (fails silently).
   static Future<UpdateInfo?> checkForUpdate() async {
     try {
       final dio = Dio();
@@ -75,11 +72,11 @@ class UpdateService {
 
       if (!_isNewer(remoteVer, localVer)) return null;
 
-      // Check whether user has already skipped this exact release (D-03).
+      // Has the user already skipped this exact release?
       final prefs = await SharedPreferences.getInstance();
       if (prefs.getString(_skipKey) == tagName) return null;
 
-      // Locate the app-release.apk asset in the release (D-10).
+      // Locate the app-release.apk asset in the release.
       final assets = data['assets'] as List<dynamic>;
       final asset = assets.firstWhere(
         (a) => (a as Map<String, dynamic>)['name'] == _apkAssetName,
@@ -94,7 +91,7 @@ class UpdateService {
         version: remoteVer,
       );
     } catch (_) {
-      // D-01: swallow ALL exceptions — network error, timeout, malformed JSON.
+      // Swallow every exception: network error, timeout, malformed JSON.
       return null;
     }
   }
@@ -102,7 +99,7 @@ class UpdateService {
   /// Downloads the APK to the app cache directory.
   ///
   /// [onProgress] receives a value in [0.0, 1.0] as bytes arrive.  When the
-  /// server omits Content-Length the callback is not called (Pitfall 4 guard).
+  /// server omits Content-Length the callback is not called.
   /// May throw — the caller (dialog) handles failure state.
   static Future<String> downloadApk(
     String url,
@@ -118,7 +115,7 @@ class UpdateService {
       savePath,
       deleteOnError: true,
       onReceiveProgress: (received, total) {
-        // Guard: total == -1 when server omits Content-Length (Pitfall 4).
+        // total == -1 when the server omits Content-Length.
         if (total > 0) onProgress(received / total);
       },
       options: Options(receiveTimeout: const Duration(minutes: 10)),
@@ -129,7 +126,7 @@ class UpdateService {
   /// Requests the install-unknown-apps permission then launches the installer.
   ///
   /// On Android 8+ (API 26+) [Permission.requestInstallPackages] does NOT
-  /// show a dialog — it redirects to Settings (Pitfall 3 / UPD-06).  After
+  /// show a dialog — it redirects to Settings.  After
   /// the user returns the status is re-checked; if still denied the method
   /// returns silently.
   static Future<void> installApk(String apkPath) async {
@@ -141,13 +138,13 @@ class UpdateService {
         if (!refreshed.isGranted) return; // user declined — abort silently
       }
     }
-    // Non-done results (e.g. fileNotFound, permissionDenied) are swallowed —
-    // consistent with the phase's fail-quiet posture.
+    // Non-done results (e.g. fileNotFound, permissionDenied) are swallowed:
+    // the updater fails quietly.
     await OpenFilex.open(apkPath);
   }
 
   /// Persists [tagName] as the skipped version so the dialog is suppressed
-  /// for this specific release on all future cold starts (D-03 / D-04).
+  /// for this specific release on all future cold starts.
   static Future<void> skipVersion(String tagName) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_skipKey, tagName);

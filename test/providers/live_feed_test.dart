@@ -147,7 +147,7 @@ void main() {
     test('a later successful connect clears the error', () {
       fakeAsync((async) {
         final h = SimHarness();
-        h.container.read(connectionErrorProvider.notifier).state = 'old';
+        h.container.read(connectionErrorProvider.notifier).set('old');
         h.connect(async);
         expect(h.container.read(connectionErrorProvider), isNull);
       });

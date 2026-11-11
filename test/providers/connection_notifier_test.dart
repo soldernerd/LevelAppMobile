@@ -32,7 +32,7 @@ void main() {
   // platform channel mock). The try/catch in _handleStatusEvent is a secondary guard.
   setUpAll(TestWidgetsFlutterBinding.ensureInitialized);
 
-  group('ConnectionNotifier — state machine (CONN-01)', () {
+  group('ConnectionNotifier — state machine', () {
     test('starts in idle state', () {
       fakeAsync((async) {
         final mock = MockBleManager(random: Random(0));
@@ -93,7 +93,7 @@ void main() {
       });
     });
 
-    test('connected → disconnected after disconnect (CONN-02)', () {
+    test('connected → disconnected after disconnect', () {
       fakeAsync((async) {
         final mock = MockBleManager(random: Random(0));
         final container = buildContainer(mock);
@@ -119,7 +119,7 @@ void main() {
       });
     });
 
-    test('connected → disconnected after simulateDisconnect (CONN-01 error path)', () {
+    test('connected → disconnected after simulateDisconnect', () {
       fakeAsync((async) {
         final mock = MockBleManager(random: Random(0));
         final container = buildContainer(mock);
@@ -141,44 +141,7 @@ void main() {
     });
   });
 
-  group('ConnectionNotifier — auto-reconnect stub (CONN-03, CONN-06)', () {
-    test('_autoReconnectEnabled constant is false — no reconnecting state after simulateDisconnect', () {
-      // _autoReconnectEnabled = false means no reconnecting state in WP1; WP2 sets to true.
-      // This test proves the false guard is active: disconnect leads directly to disconnected.
-      fakeAsync((async) {
-        final mock = MockBleManager(random: Random(0));
-        final container = buildContainer(mock);
-
-        container
-            .read(connectionNotifierProvider.notifier)
-            .connect('AA:BB:CC:DD:EE:FF');
-        async.elapse(const Duration(milliseconds: 350));
-        async.flushMicrotasks();
-
-        mock.simulateDisconnect();
-        async.flushMicrotasks();
-
-        expect(
-          container.read(connectionNotifierProvider),
-          equals(ConnectionStatus.disconnected),
-          reason:
-              '_autoReconnectEnabled=false: state must be disconnected, not reconnecting',
-        );
-      });
-    });
-
-    test('ConnectionStatus.reconnecting exists in enum (CONN-06)', () {
-      // The reconnecting enum value must be present for Phase 4 UI mapping even though
-      // it is not reachable via _autoReconnectEnabled=false in WP1.
-      expect(
-        ConnectionStatus.values.contains(ConnectionStatus.reconnecting),
-        isTrue,
-        reason: 'ConnectionStatus.reconnecting must exist for Phase 4 UI',
-      );
-    });
-  });
-
-  group('ConnectionNotifier — scan results accumulation (CONN-01)', () {
+  group('ConnectionNotifier — scan results accumulation', () {
     test('scannedDevices accumulates devices during scan', () {
       fakeAsync((async) {
         final mock = MockBleManager(random: Random(0));

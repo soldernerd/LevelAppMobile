@@ -28,7 +28,8 @@ GoRouter buildRouter({
     redirect: (context, state) {
       final segments = state.matchedLocation.split('/');
       final driver = segments.length > 1 ? registry.byId(segments[1]) : null;
-      // The matchedLocation check prevents redirect loops when already on /scan.
+      // A driver's routes need an active session of that driver; /scan itself
+      // is never redirected, so there is no loop.
       if (driver != null && readActive()?.driver.id != driver.id) {
         return '/scan';
       }

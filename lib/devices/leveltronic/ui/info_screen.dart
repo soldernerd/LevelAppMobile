@@ -17,7 +17,7 @@ class InfoScreen extends ConsumerWidget {
     final d = ref.watch(instrumentDataProvider).asData?.value;
     final status = d?.status;
     final env = d?.env;
-    final identity = ref.watch(identityProvider).asData?.value;
+    final identity = ref.watch(identityProvider);
     final health = ref.watch(healthProvider).asData?.value.value;
     final rtc = ref.watch(rtcProvider).asData?.value;
 

@@ -72,11 +72,8 @@ class PhaseEstimate {
   /// cancelled (it adds a small error when the tilt is not large against it).
   final bool singleSided;
 
-  /// The instrument stores the phase in ±180°.
-  bool get inRange => angleDeg.abs() <= 180.0;
-
-  /// Stored unit: 0.01°.
-  int get centiDegrees => (angleDeg * 100).round().clamp(-18000, 18000);
+  /// Stored unit: 0.01° (the instrument takes ±180°, which [angleDeg] is in).
+  int get centiDegrees => (angleDeg * 100).round();
 
   /// Good enough to apply without a second thought.
   bool get confident => snr >= 8 && uncertaintyDeg <= 0.5;

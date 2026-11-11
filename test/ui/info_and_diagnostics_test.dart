@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:inclinometer/devices/leveltronic/simulated_device.dart';
+import 'package:inclinometer/models/connection.dart';
+import 'package:inclinometer/providers/device_provider.dart';
 
 import '../support/app_harness.dart';
 
@@ -197,6 +199,26 @@ void main() {
       final text = tester.widget<Text>(find.byKey(const ValueKey('scan-error')));
       expect(text.data, contains('API v2'));
       expect(text.data, contains('needs API v3'));
+      await h.dispose(tester);
+    });
+
+    testWidgets('shows the error above the scan results, without a layout error',
+        (tester) async {
+      final h = await AppHarness.start(tester,
+          device: SimulatedDevice(apiVersion: 2), location: '/scan');
+      final n = h.container.read(connectionNotifierProvider.notifier);
+      n.startScan();
+      await h.pump(tester, const Duration(seconds: 1));
+      expect(h.container.read(scanResultsProvider), isNotEmpty);
+
+      n.connect('AA:BB:CC:DD:EE:FF');
+      await h.pump(tester, const Duration(seconds: 1));
+      expect(h.container.read(connectionNotifierProvider),
+          equals(ConnectionStatus.error));
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const ValueKey('scan-error')), findsOneWidget);
+      expect(find.text('Leveltronic-EEFF'), findsOneWidget);
       await h.dispose(tester);
     });
   });

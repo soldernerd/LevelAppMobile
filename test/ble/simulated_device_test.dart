@@ -18,7 +18,8 @@ void main() {
     test('IDENTITY reports API v3 and passes the compatibility check', () {
       fakeAsync((async) {
         final api = InstrumentApi(SimulatedDevice());
-        final id = settle(async, api.verifyCompatible());
+        final id = settle(async, api.identity());
+        ensureCompatible(id);
         expect(id.apiVersion, equals(3));
         expect(id.apiVersionText, equals('3.1'));
         expect(id.serial, equals('6DA08073'));
@@ -28,8 +29,9 @@ void main() {
     test('an API v2 instrument is refused with IncompatibleFirmware', () {
       fakeAsync((async) {
         final api = InstrumentApi(SimulatedDevice(apiVersion: 2));
+        final id = settle(async, api.identity());
         expect(
-          () => settle(async, api.verifyCompatible()),
+          () => ensureCompatible(id),
           throwsA(isA<IncompatibleFirmwareException>()
               .having((e) => e.apiVersion, 'apiVersion', 2)),
         );

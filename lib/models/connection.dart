@@ -10,7 +10,6 @@ enum ConnectionStatus {
   disconnecting,
   disconnected,
   error,
-  reconnecting,
 }
 
 /// A BLE device discovered during a scan.

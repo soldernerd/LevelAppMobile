@@ -1,17 +1,52 @@
-# inclinometer
+# Leveltronic
 
-A new Flutter project.
+Flutter companion app for precision inclinometers, over Bluetooth Low Energy.
+Android is the primary platform (an iOS scaffold exists but is untested).
 
-## Getting Started
+**Package:** `com.soldernerd.inclinometer`
 
-This project is a starting point for a Flutter application.
+## Instruments
 
-A few resources to get you started if this is your first Flutter project:
+| Family | Advertises as | Notes |
+|---|---|---|
+| Leveltronic precision level (STM32G0B1 / RN4871) | `Leveltronic-<xxxx>` | Firmware speaking API v3. Live S1 / S2 / Diff in mm/m, precision measurement, guided calibration (flip zero, phase, gain), all settings, diagnostics and oscilloscope view. |
+| NeigMess2 capacitive inclination meter | `NeigMess2…` | API v2 over the same transport. Live tilt and sensors, flip-test zero, tilt trim and neutral calibration. |
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Several instruments can be connected at once; the device switcher in the top
+bar chooses which one the screens show. Instruments can be given names of
+your own. **Open demo instrument** on the scan screen runs a simulated
+Leveltronic, so the app can be tried without hardware.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Development
+
+```bash
+flutter pub get
+flutter analyze
+flutter test
+flutter run --flavor github     # or --flavor play
+```
+
+`flutter run` and `flutter build` need `--flavor github` or `--flavor play`;
+`flutter test` and `flutter analyze` do not.
+
+| Flavor | Channel | Self-update |
+|---|---|---|
+| `github` | GitHub Releases (sideload) | in-app updater |
+| `play` | Google Play | compiled out; no `INTERNET` permission |
+
+On Windows, `fl.ps1` wraps `flutter` and clears build directories that OneDrive
+locks (`.\fl.ps1 run -d <device>`).
+
+## Releases
+
+Every push to `main` is built by `.github/workflows/ci.yml`: analysis and tests,
+then a signed `github` APK published as a GitHub release (`v<major>.<minor>.<n>`,
+`major.minor` from `pubspec.yaml`, `n` the commit count) and a `play` app bundle
+as a workflow artifact.
+
+## Where things are
+
+Architecture, the device protocol and the conventions are written down in
+[`CLAUDE.md`](CLAUDE.md). The device protocol itself is specified in the
+instrument firmware repositories. Store listing and privacy policy sources are
+in [`docs/`](docs/).

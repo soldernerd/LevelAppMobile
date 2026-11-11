@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:inclinometer/devices/leveltronic/calibration/sensor_mask.dart';
 import 'package:inclinometer/devices/leveltronic/providers/flip_cal_provider.dart';
 import 'package:inclinometer/devices/leveltronic/providers/service_provider.dart';
 import 'package:inclinometer/devices/leveltronic/ui/widgets/format.dart';

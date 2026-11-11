@@ -56,12 +56,15 @@ API v3 only (3.1 is the newest minor it knows, `kApiMinor`; IDENTITY `api_minor`
   the app shows it (STATUS `service_mode`), can end it (SERVICE_END), and sends
   a cheap request every 30 s while a wizard is open
   (`serviceKeepAliveProvider`) because it ends after 10 minutes without one.
+- **Identity**: `identityProvider` is simply the active session's `identity`
+  (read once at connect by `DeviceRegistry`) — synchronous, no extra request.
+  Per-instrument preferences (Zero Diff, gain-cal shim) are keyed by its serial.
 - **Zero Diff** is app-side (`tareProvider`, per serial in SharedPreferences):
   the firmware has no such function and moving S1_ZERO/S2_ZERO would change S1
   and S2 too.
-- **Calibration wizards** (`lib/providers/*_cal_provider.dart`, math in
-  `lib/calibration/calibration_math.dart`, all tested end to end against the
-  simulator's known truth):
+- **Calibration wizards** (`lib/devices/leveltronic/providers/*_cal_provider.dart`,
+  math in `lib/devices/leveltronic/calibration/calibration_math.dart`, all tested
+  end to end against the simulator's known truth):
   - *Flip (zero)*: Commands ZERO_CAL step 1 → user turns 180° → step 2 →
     firmware stores the zero; the app shows zero before/after.
   - *Phase*: capture the phasor stream (wire order S2, B, A, S1 since fw
@@ -77,6 +80,9 @@ API v3 only (3.1 is the newest minor it knows, `kApiMinor`; IDENTITY `api_minor`
 - **Settings** page is data-driven from `lib/ble/api_catalog.dart`. Settings
   0x53 (max minutes at 100 %) is *optional*: it is reserved for the
   drift-probe branch and is hidden unless a GET answers.
+- **Play flavor manifest:** `android/app/src/play/AndroidManifest.xml` strips what
+  the `open_filex` plugin (self-updater only) would otherwise merge into the Play
+  build — storage/media read permissions and its FileProvider.
 - **Fake-async gotcha (tests):** never `await` a `StreamSubscription.cancel()`
   in code that tests drive with `fakeAsync` — its future is created in the
   root zone and never completes there. Use `unawaited(sub.cancel())`.

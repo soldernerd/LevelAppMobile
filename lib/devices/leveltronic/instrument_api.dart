@@ -16,17 +16,14 @@ import 'package:inclinometer/devices/device_driver.dart';
 class IncompatibleFirmwareException implements ConnectFailure {
   const IncompatibleFirmwareException(this.apiVersion, this.firmware);
 
-  /// The `api_version` the instrument reported, or null if it did not answer
-  /// a v3 IDENTITY request at all (a v2 or older firmware).
-  final int? apiVersion;
-  final String? firmware;
+  /// The `api_version` the instrument reported.
+  final int apiVersion;
+  final String firmware;
 
   @override
-  String get message => apiVersion == null
-      ? 'This instrument runs firmware that does not speak API v$kApiVersion. '
-          'Update it to 0.11 or newer.'
-      : 'This instrument speaks API v$apiVersion (firmware ${firmware ?? '?'}); '
-          'this app needs API v$kApiVersion.';
+  String get message =>
+      'This instrument speaks API v$apiVersion (firmware $firmware); '
+      'this app needs API v$kApiVersion.';
 
   @override
   String toString() => 'IncompatibleFirmwareException($message)';
@@ -60,18 +57,6 @@ class InstrumentApi {
       ApiIdentity.decode(await _get(opGet(ApiCat.system, SysRes.identity),
           'identity')),
       'identity');
-
-  /// Reads IDENTITY and throws [IncompatibleFirmwareException] unless it
-  /// reports API v[kApiVersion].
-  Future<ApiIdentity> verifyCompatible() async {
-    final r = await link.request(opGet(ApiCat.system, SysRes.identity));
-    final id = r.ok ? ApiIdentity.decode(r.data) : null;
-    // An older firmware answers v3's IDENTITY opcode with an error or with
-    // the short v2 payload.
-    if (id == null) throw const IncompatibleFirmwareException(null, null);
-    ensureCompatible(id);
-    return id;
-  }
 
   Future<ApiSystemState> state() async => _decoded(
       ApiSystemState.decode(

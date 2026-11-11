@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'package:inclinometer/ble/ble_manager.dart';
@@ -14,7 +13,6 @@ import 'package:inclinometer/models/connection.dart';
 /// Must be overridden at the ProviderScope root — throws [UnimplementedError]
 /// if accessed without an override. `main.dart` overrides it with
 /// `RealBleManager`; tests with [MockBleManager].
-// ARCH: BLE connection provider must survive navigation (CLAUDE.md: keepAlive).
 final bleManagerProvider = Provider<BleManager>((ref) {
   throw UnimplementedError('bleManagerProvider must be overridden at root');
 });
@@ -27,7 +25,17 @@ final deviceRegistryProvider = Provider<DeviceRegistry>((ref) {
 
 /// Why the last connect / scan failed, for the scan screen. Null when the
 /// failure had no more specific cause than "Bluetooth".
-final connectionErrorProvider = StateProvider<String?>((ref) => null);
+class ConnectionErrorNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void set(String? message) => state = message;
+}
+
+final connectionErrorProvider =
+    NotifierProvider<ConnectionErrorNotifier, String?>(
+  ConnectionErrorNotifier.new,
+);
 
 /// The open devices, and which one the UI is focused on.
 class OpenSessions {
@@ -121,9 +129,6 @@ final activeSessionProvider = Provider<DeviceSession?>((ref) {
 /// least one device is open and nothing else is going on; the devices
 /// themselves are in [sessionsProvider].
 class ConnectionNotifier extends Notifier<ConnectionStatus> {
-  // Auto-reconnect is a stub: structure in place, not active.
-  static const bool _autoReconnectEnabled = false;
-
   final _scannedDevices = <ScannedDevice>[];
 
   /// Unmodifiable snapshot of accumulated scan results.
@@ -160,9 +165,7 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
       final had = !(prev?.isEmpty ?? true);
       if (next.isEmpty && had) {
         WakelockPlus.disable().catchError((_) {});
-        state = _autoReconnectEnabled
-            ? ConnectionStatus.reconnecting
-            : ConnectionStatus.disconnected;
+        state = ConnectionStatus.disconnected;
       } else if (!next.isEmpty && !had) {
         // .catchError: async platform channel may throw in test environments.
         WakelockPlus.enable().catchError((_) {});
@@ -188,7 +191,7 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
   Future<void> startScan() async {
     _scannedDevices.clear();
     ref.read(_scanRevisionProvider.notifier).reset();
-    ref.read(connectionErrorProvider.notifier).state = null;
+    ref.read(connectionErrorProvider.notifier).set(null);
     try {
       await ref.read(bleManagerProvider).startScan(
             accept: ref.read(deviceRegistryProvider).acceptsAdvertisedName,
@@ -211,7 +214,7 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
   /// and, for a device the app cannot use, a specific message in
   /// [connectionErrorProvider].
   Future<void> connect(String deviceId) async {
-    ref.read(connectionErrorProvider.notifier).state = null;
+    ref.read(connectionErrorProvider.notifier).set(null);
     final sessions = ref.read(sessionsProvider.notifier);
     if (ref.read(sessionsProvider).contains(deviceId)) {
       sessions.activate(deviceId);
@@ -228,11 +231,12 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
       sessions.add(session);
       state = ConnectionStatus.connected;
     } on ConnectFailure catch (e) {
-      ref.read(connectionErrorProvider.notifier).state = e.message;
+      ref.read(connectionErrorProvider.notifier).set(e.message);
       state = ConnectionStatus.error;
     } catch (e) {
-      ref.read(connectionErrorProvider.notifier).state =
-          'Could not connect to the device.';
+      ref
+          .read(connectionErrorProvider.notifier)
+          .set('Could not connect to the device.');
       state = ConnectionStatus.error;
     }
   }
@@ -254,7 +258,7 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
   /// [MockBleManager.demo] for the duration of the session and disposes it
   /// when the connection closes.
   Future<void> connectDemo() async {
-    ref.read(connectionErrorProvider.notifier).state = null;
+    ref.read(connectionErrorProvider.notifier).set(null);
     const demoId = 'DEMO:00:00:00:00:00';
     final sessions = ref.read(sessionsProvider.notifier);
     if (ref.read(sessionsProvider).contains(demoId)) {
@@ -272,8 +276,7 @@ class ConnectionNotifier extends Notifier<ConnectionStatus> {
       sessions.add(session);
       state = ConnectionStatus.connected;
     } catch (e) {
-      ref.read(connectionErrorProvider.notifier).state =
-          'Could not start demo.';
+      ref.read(connectionErrorProvider.notifier).set('Could not start demo.');
       state = ConnectionStatus.error;
     }
   }
@@ -312,5 +315,14 @@ final scanResultsProvider = Provider<List<ScannedDevice>>((ref) {
 });
 
 /// Whether BLE permissions are permanently denied on this device.
+class BlePermissionDeniedNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void set(bool denied) => state = denied;
+}
+
 final blePermissionPermanentlyDeniedProvider =
-    StateProvider<bool>((ref) => false);
+    NotifierProvider<BlePermissionDeniedNotifier, bool>(
+  BlePermissionDeniedNotifier.new,
+);

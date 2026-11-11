@@ -1,5 +1,5 @@
 // test/ui/scan_screen_test.dart
-// Widget tests for ScanScreen — SCAN-01 through SCAN-05 and INST-01.
+// Widget tests for ScanScreen.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -69,8 +69,8 @@ Widget buildHarness(
 void main() {
   setUpAll(TestWidgetsFlutterBinding.ensureInitialized);
 
-  group('SCAN-01: FAB icon toggle — startScan and stopScan', () {
-    testWidgets('SCAN-01: FAB shows bluetooth_searching icon when idle',
+  group('FAB icon toggle — startScan and stopScan', () {
+    testWidgets('FAB shows bluetooth_searching icon when idle',
         (tester) async {
       final ble = MockBleManager();
       await tester.pumpWidget(buildHarness(ble));
@@ -79,7 +79,7 @@ void main() {
       expect(find.byIcon(Icons.bluetooth_searching), findsOneWidget);
     });
 
-    testWidgets('SCAN-01: FAB shows stop icon when scanning', (tester) async {
+    testWidgets('FAB shows stop icon when scanning', (tester) async {
       final ble = MockBleManager();
       await tester.pumpWidget(buildHarness(ble));
       await tester.pump();
@@ -93,8 +93,8 @@ void main() {
     });
   });
 
-  group('SCAN-02: Device list renders name and RSSI', () {
-    testWidgets('SCAN-02: named device appears with name and dBm trailing text',
+  group('Device list renders name and RSSI', () {
+    testWidgets('named device appears with name and dBm trailing text',
         (tester) async {
       final ble = MockBleManager();
       await tester.pumpWidget(buildHarness(ble));
@@ -113,8 +113,8 @@ void main() {
     });
   });
 
-  group('SCAN-03: Unnamed devices are filtered from the list', () {
-    testWidgets('SCAN-03: only named devices appear in the list', (tester) async {
+  group('Unnamed devices are filtered from the list', () {
+    testWidgets('only named devices appear in the list', (tester) async {
       final ble = MockBleManager();
       addTearDown(ble.dispose);
       final router = _buildRouter();
@@ -143,8 +143,8 @@ void main() {
     });
   });
 
-  group('SCAN-04: Scan state chip shows correct label', () {
-    testWidgets('SCAN-04: chip label is Idle when status is idle', (tester) async {
+  group('Scan state chip shows correct label', () {
+    testWidgets('chip label is Idle when status is idle', (tester) async {
       final ble = MockBleManager();
       await tester.pumpWidget(buildHarness(ble));
       await tester.pump();
@@ -152,7 +152,7 @@ void main() {
       expect(find.text('Idle'), findsOneWidget);
     });
 
-    testWidgets('SCAN-04: chip label is Scanning when scanning', (tester) async {
+    testWidgets('chip label is Scanning when scanning', (tester) async {
       final ble = MockBleManager();
       addTearDown(ble.dispose);
       final router = _buildRouter();
@@ -176,8 +176,8 @@ void main() {
     });
   });
 
-  group('SCAN-05: Tapping a device tile calls connect()', () {
-    testWidgets('SCAN-05: tapping a device tile calls connect and transitions to Connecting',
+  group('Tapping a device tile calls connect()', () {
+    testWidgets('tapping a device tile calls connect and transitions to Connecting',
         (tester) async {
       final ble = MockBleManager();
       final router = _buildRouter();
@@ -218,7 +218,7 @@ void main() {
     });
   });
 
-  group('UPD-02: Update dialog', () {
+  group('Update dialog', () {
     setUp(() {
       // Reset file-scope guard so the dialog can appear in each test run.
       resetUpdateDialogShownForTest();
@@ -227,7 +227,7 @@ void main() {
     });
 
     testWidgets(
-        'UPD-02: dialog appears naming the new version when an update is available',
+        'dialog appears naming the new version when an update is available',
         (tester) async {
       final ble = MockBleManager();
       addTearDown(ble.dispose);
@@ -268,7 +268,7 @@ void main() {
     });
 
     testWidgets(
-        'UPD-02: tapping Skip dismisses the dialog and persists the skipped tag',
+        'tapping Skip dismisses the dialog and persists the skipped tag',
         (tester) async {
       final ble = MockBleManager();
       addTearDown(ble.dispose);
@@ -308,7 +308,7 @@ void main() {
       expect(prefs.getString('skipped_update_version'), equals('v9.9.9'));
     });
 
-    testWidgets('UPD-02: no dialog when update result is null (up-to-date)',
+    testWidgets('no dialog when update result is null (up-to-date)',
         (tester) async {
       final ble = MockBleManager();
       await tester.pumpWidget(buildHarness(ble));
@@ -320,8 +320,8 @@ void main() {
     });
   });
 
-  group('INST-01: InstrumentScreen is pushed after ConnectionStatus.connected', () {
-    testWidgets('INST-01: navigates to InstrumentScreen on connected status',
+  group('InstrumentScreen is pushed after ConnectionStatus.connected', () {
+    testWidgets('navigates to InstrumentScreen on connected status',
         (tester) async {
       // Use a wide surface to prevent RenderFlex overflow when InstrumentScreen renders
       // its 80sp angle readout.

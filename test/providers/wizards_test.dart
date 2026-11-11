@@ -2,10 +2,12 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:inclinometer/devices/leveltronic/api_catalog.dart';
 import 'package:inclinometer/ble/api_v3.dart';
 import 'package:inclinometer/devices/leveltronic/protocol.dart';
+import 'package:inclinometer/devices/leveltronic/calibration/sensor_mask.dart';
 import 'package:inclinometer/devices/leveltronic/providers/flip_cal_provider.dart';
 import 'package:inclinometer/devices/leveltronic/providers/gain_cal_provider.dart';
 import 'package:inclinometer/devices/leveltronic/providers/phase_cal_provider.dart';
@@ -346,15 +348,13 @@ void main() {
       });
     });
 
-    test('both sensors are written when both are in range', () {
+    test('writes phases far outside the old ±45° limit', () {
       fakeAsync((async) {
         final h = SimHarness()..connect(async);
         h.sim.setServiceMode(true);
         h.sim.truePhaseDeg = [70.0, 10.5];
         final state = hold(h.container, phaseCalProvider);
-        final s = runToReview(async, h, state);
-        expect(s.estimates[0]!.inRange, isTrue);
-        expect(s.estimates[1]!.inRange, isTrue);
+        runToReview(async, h, state);
         h.container.read(phaseCalProvider.notifier).apply();
         pass(async, const Duration(seconds: 1));
         expect(h.sim.calibration(kS1Phase), closeTo(7000, 10));
@@ -501,6 +501,24 @@ void main() {
         n.setShimForSensor(1, heightMm: 0, baselineMm: 1000);
         n.begin();
         expect(state().stage, equals(GainStage.setup));
+      });
+    });
+
+    test('a cleared field is not remembered for the next visit', () {
+      fakeAsync((async) {
+        SharedPreferences.setMockInitialValues({});
+        final h = SimHarness()..connect(async);
+        hold(h.container, gainCalProvider);
+        pass(async, const Duration(milliseconds: 500));
+        final n = h.container.read(gainCalProvider.notifier);
+        n.setShimForSensor(0, heightMm: 0.2, baselineMm: 400);
+        pass(async, const Duration(milliseconds: 100));
+        // The user clears the height field to retype it.
+        n.setShimForSensor(0, heightMm: 0, baselineMm: 400);
+        pass(async, const Duration(milliseconds: 100));
+        final prefs = settle(async, SharedPreferences.getInstance());
+        expect(prefs.getDouble('gain_cal_shim_height_6DA08073_0'), equals(0.2));
+        expect(prefs.getDouble('gain_cal_baseline_6DA08073_0'), equals(400));
       });
     });
   });

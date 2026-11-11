@@ -7,7 +7,7 @@ import 'package:inclinometer/devices/leveltronic/protocol.dart';
 import 'package:inclinometer/ble/device_link.dart';
 import 'package:inclinometer/devices/leveltronic/calibration/calibration_math.dart';
 import 'package:inclinometer/devices/leveltronic/providers/leveltronic_provider.dart';
-import 'package:inclinometer/devices/leveltronic/providers/flip_cal_provider.dart' show SensorMask;
+import 'package:inclinometer/devices/leveltronic/calibration/sensor_mask.dart';
 
 /// Which tilts the phase calibration measures.
 enum PhaseMode {
@@ -306,9 +306,7 @@ class PhaseCalNotifier extends Notifier<PhaseCalState> {
       final before = await _readPhases();
       for (var i = 0; i < 2; i++) {
         final est = state.estimates[i];
-        if (!SensorMask.has(state.mask, i) || est == null || !est.inRange) {
-          continue;
-        }
+        if (!SensorMask.has(state.mask, i) || est == null) continue;
         await api.writeValue(kSensorPhase[i], est.centiDegrees);
       }
       final after = await _readPhases();

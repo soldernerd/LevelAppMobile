@@ -153,7 +153,9 @@ Config: YOLO mode, standard granularity, parallel execution, research + plan-che
 | wakelock_plus | latest | Acquire on connected, release on disconnected |
 | material_ui | ^1.11.0 | Material widgets. `package:flutter/material.dart` is deprecated since Flutter 3.47 (CI runs `--fatal-infos`), so import `package:material_ui/material_ui.dart`. Needs Flutter >= 3.50 |
 
-**Build:** `minSdkVersion 24` / `compileSdkVersion 35`
+**Build:** `minSdkVersion 24` / `compileSdk 36`. Android toolchain follows what Flutter's
+template ships: Gradle 9.5.0, AGP 9.3.1, Kotlin 2.4.20 (Flutter 3.50 refuses Gradle
+< 9.3.1, AGP < 9.1.1, Kotlin < 2.4.10; bump them together when Flutter moves).
 
 ## Distribution / build flavors
 

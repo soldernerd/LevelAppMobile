@@ -5,7 +5,13 @@ instrument (STM32G0B1 / RN4871). The scaffold was built mock-first (phases
 1–7); real BLE is now wired against the REV B firmware.
 
 **Package:** `com.soldernerd.inclinometer`
-**Version:** 1.0.x (CI: `major.minor` from `pubspec.yaml`, patch = git commit count)
+**Version:** 1.0.x. CI (`.github/scripts/compute-version.sh`) builds `<major>.<minor>.<patch>`:
+major.minor come from the `version:` line of `pubspec.yaml`; the patch is the number of
+commits since major.minor was last bumped, so **the patch goes back to 0 whenever major
+or minor is bumped** (to release 1.1: change `version: 1.1.0+1`, the next build is
+v1.1.0). Only major.minor of that line matters; the patch part and the `+build` part
+in pubspec.yaml are ignored by CI. The Android build number (`versionCode`) is the
+total commit count and never resets, because Google Play needs it to keep growing.
 **Naming:** the app is *LevelApp Mobile*. "Leveltronic" is a third-party (Wyler)
 trade name: never in user-visible text — app label, titles, display names, store
 listing, privacy policy. It remains only where the hardware dictates it (the BLE
@@ -172,7 +178,8 @@ Two Android product flavors (dimension `distribution`, same `applicationId`):
   — a compile-time const, so the updater tree-shakes out of the Play binary.
   Host/unit-test builds have no flavor ⇒ treated as `github`.
 - CI (`ci.yml`, push to `main`): builds the `github` APK (renamed to
-  `app-release.apk` for the self-updater), publishes the GitHub release, and
+  `app-release.apk` for the self-updater), publishes the GitHub release (tag
+  `v<major>.<minor>.<patch>`), and
   builds the `play` AAB as a workflow artifact (`play-release-aab`). Wire a
   `PLAY_SERVICE_ACCOUNT_JSON` secret + `r0adkll/upload-google-play` to publish
   to Play directly.

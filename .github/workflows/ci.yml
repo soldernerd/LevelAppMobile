@@ -32,21 +32,18 @@ jobs:
         run: flutter test
 
       # ── Release steps (push to main only) ────────────────────────────────
-      # Version: <major>.<minor>.<commit-count>  e.g. v0.1.47
-      # major.minor are read from pubspec.yaml so bumping the version there
-      # automatically flows into the tag and the APK — no manual edits needed.
+      # Version: <major>.<minor>.<patch>  e.g. v1.0.7
+      # major.minor are read from pubspec.yaml; patch counts the commits since
+      # major.minor was last bumped, so it restarts at 0 on every major/minor
+      # bump (.github/scripts/compute-version.sh). The Android build number is
+      # the total commit count instead: Google Play needs it to only ever grow.
       # --build-name embeds the version in the APK so PackageInfo returns it,
       # which allows the self-update check to compare correctly.
 
       - name: Compute version tag
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         id: ver
-        run: |
-          COUNT=$(git rev-list --count HEAD)
-          # Extract major.minor from pubspec.yaml version line (e.g. "0.1.0+1" → "0.1")
-          BASE=$(grep '^version:' pubspec.yaml | sed 's/version: *//;s/\([0-9]*\.[0-9]*\)\..*/\1/')
-          echo "name=${BASE}.${COUNT}" >> "$GITHUB_OUTPUT"
-          echo "tag=v${BASE}.${COUNT}"  >> "$GITHUB_OUTPUT"
+        run: bash .github/scripts/compute-version.sh >> "$GITHUB_OUTPUT"
 
       - name: Decode keystore
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

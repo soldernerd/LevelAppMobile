@@ -19,6 +19,8 @@ precision level, so the app can be tried without hardware.
 
 ## Development
 
+Needs Flutter 3.50 or newer (the Material widgets come from `material_ui`).
+
 ```bash
 flutter pub get
 flutter analyze

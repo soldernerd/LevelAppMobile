@@ -151,6 +151,7 @@ Config: YOLO mode, standard granularity, parallel execution, research + plan-che
 | permission_handler | 12.0.3 | Requires compileSdkVersion 35 |
 | go_router | 17.3.0 | refreshListenable bridge needed for Riverpod providers |
 | wakelock_plus | latest | Acquire on connected, release on disconnected |
+| material_ui | ^1.11.0 | Material widgets. `package:flutter/material.dart` is deprecated since Flutter 3.47 (CI runs `--fatal-infos`), so import `package:material_ui/material_ui.dart`. Needs Flutter >= 3.50 |
 
 **Build:** `minSdkVersion 24` / `compileSdkVersion 35`
 

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:inclinometer/ble/api_v3.dart';
 import 'package:inclinometer/ble/device_link.dart';

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Shows whether the last 0.6 s window of a reading looked disturbed (a bump,
 /// footsteps, a machine starting): amber and labelled when it did, a quiet

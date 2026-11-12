@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// The common frame of the wizard screens: dark scaffold, title, scrollable
 /// padded column, optional bottom action bar.

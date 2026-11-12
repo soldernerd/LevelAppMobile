@@ -5,6 +5,7 @@ import 'package:inclinometer/devices/leveltronic/api_catalog.dart';
 import 'package:inclinometer/ble/api_v3.dart';
 import 'package:inclinometer/devices/leveltronic/protocol.dart';
 import 'package:inclinometer/ble/device_link.dart';
+import 'package:inclinometer/ble/mock_ble_manager.dart';
 import 'package:inclinometer/devices/leveltronic/instrument_api.dart';
 import 'package:inclinometer/devices/leveltronic/simulated_device.dart';
 
@@ -35,6 +36,32 @@ void main() {
           throwsA(isA<IncompatibleFirmwareException>()
               .having((e) => e.apiVersion, 'apiVersion', 2)),
         );
+      });
+    });
+
+    test('API 3.0 (no minor reported) is refused, a newer minor is accepted', () {
+      fakeAsync((async) {
+        final old = settle(
+            async, InstrumentApi(SimulatedDevice(apiMinor: 0)).identity());
+        expect(old.apiVersionText, equals('3.0'));
+        expect(
+          () => ensureCompatible(old),
+          throwsA(isA<IncompatibleFirmwareException>().having(
+              (e) => e.message, 'message', contains('API v3.1 or newer'))),
+        );
+        final newer = settle(
+            async, InstrumentApi(SimulatedDevice(apiMinor: 2)).identity());
+        ensureCompatible(newer);
+      });
+    });
+
+    test('the demo instrument starts in service mode and stays there', () {
+      fakeAsync((async) {
+        final demo = MockBleManager.demo();
+        expect(demo.sim.serviceMode, isTrue);
+        async.elapse(const Duration(minutes: 30));
+        expect(demo.sim.serviceMode, isTrue);
+        demo.dispose();
       });
     });
 

@@ -69,6 +69,10 @@ class SimulatedDevice implements SimulatedPeripheral {
   /// Let the physical tilt wander (dev runs); off in tests.
   bool wander = false;
 
+  /// Service mode does not time out (the demo instrument); only the app's
+  /// "Leave service mode" ends it.
+  bool keepServiceMode = false;
+
   /// Marks the readings doubtful (vibration).
   bool disturbed = false;
 
@@ -300,7 +304,7 @@ class SimulatedDevice implements SimulatedPeripheral {
 
   void _touchServiceTimer() {
     _serviceTimer?.cancel();
-    if (_serviceMode) {
+    if (_serviceMode && !keepServiceMode) {
       _serviceTimer = Timer(const Duration(minutes: 10), () {
         _serviceMode = false;
       });

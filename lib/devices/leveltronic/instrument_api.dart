@@ -14,25 +14,29 @@ import 'package:inclinometer/devices/device_driver.dart';
 
 /// The connected instrument does not speak the protocol this app does.
 class IncompatibleFirmwareException implements ConnectFailure {
-  const IncompatibleFirmwareException(this.apiVersion, this.firmware);
+  const IncompatibleFirmwareException(
+      this.apiVersion, this.apiMinor, this.firmware);
 
-  /// The `api_version` the instrument reported.
+  /// The API version the instrument reported (`api_version`, `api_minor`).
   final int apiVersion;
+  final int apiMinor;
   final String firmware;
 
   @override
   String get message =>
-      'This instrument speaks API v$apiVersion (firmware $firmware); '
-      'this app needs API v$kApiVersion.';
+      'This instrument speaks API v$apiVersion.$apiMinor (firmware $firmware); '
+      'this app needs API v$kApiVersion.$kApiMinMinor or newer.';
 
   @override
   String toString() => 'IncompatibleFirmwareException($message)';
 }
 
-/// Throws [IncompatibleFirmwareException] unless [id] reports API v[kApiVersion].
+/// Throws [IncompatibleFirmwareException] unless [id] reports API
+/// v[kApiVersion].[kApiMinMinor] or a newer minor of it.
 void ensureCompatible(ApiIdentity id) {
-  if (id.apiVersion != kApiVersion) {
-    throw IncompatibleFirmwareException(id.apiVersion, id.firmware);
+  if (id.apiVersion != kApiVersion || !id.atLeast(kApiVersion, kApiMinMinor)) {
+    throw IncompatibleFirmwareException(
+        id.apiVersion, id.apiMinor, id.firmware);
   }
 }
 

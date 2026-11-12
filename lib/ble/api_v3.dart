@@ -25,11 +25,15 @@ import 'dart:typed_data';
 /// The protocol version of the framing/opcode scheme. System IDENTITY reports it.
 const int kApiVersion = 3;
 
-/// The newest minor version of [kApiVersion] this app knows (API 3.1). A
-/// device with a lower minor works too and simply lacks the newer features; one
-/// with a higher minor works as well and its additions are not used. Only the
-/// major version decides compatibility.
+/// The newest minor version of [kApiVersion] this app knows (API 3.1). A device
+/// with a higher minor works as well and its additions are not used.
 const int kApiMinor = 1;
+
+/// The oldest minor of [kApiVersion] the app accepts: it relies on what API 3.1
+/// defines (the phasor and diagnostics channel order, the IDENTITY minor), and
+/// it is the API that counts, not the firmware version. A device that reports
+/// no minor (firmware before 0.15.0) reads as 3.0 and is refused.
+const int kApiMinMinor = 1;
 
 class ApiVerb {
   static const int get = 0x0;

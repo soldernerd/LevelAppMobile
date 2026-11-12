@@ -45,7 +45,7 @@ class InstrumentScreen extends ConsumerWidget {
       backgroundColor: const Color(0xFF121212),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1E1E1E),
-        title: const DeviceTitle(fallback: 'Leveltronic'),
+        title: const DeviceTitle(fallback: 'Precision level'),
         actions: [
           if (d?.onboardTempC != null) ...[
             const Icon(Icons.thermostat, size: 18, color: Colors.white54),

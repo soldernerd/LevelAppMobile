@@ -54,10 +54,15 @@ class MockBleManager implements BleManager {
   }) : assert(peripherals.isNotEmpty);
 
   /// A mock for running the app by hand: the simulated tilt wanders a little
-  /// so the live screen is not frozen. (Tests use the plain constructor, whose
-  /// tilt only changes when the test says so.)
-  factory MockBleManager.demo() =>
-      MockBleManager(device: SimulatedDevice(noise: 0.0004)..wander = true);
+  /// so the live screen is not frozen, and service mode is on (and stays on)
+  /// so the calibration wizards can be tried. (Tests use the plain
+  /// constructor, whose tilt only changes when the test says so.)
+  factory MockBleManager.demo() => MockBleManager(
+        device: SimulatedDevice(noise: 0.0004)
+          ..wander = true
+          ..keepServiceMode = true
+          ..setServiceMode(true),
+      );
 
   final List<MockPeripheral> peripherals;
   final Duration connectDelay;

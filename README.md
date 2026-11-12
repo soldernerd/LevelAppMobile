@@ -1,4 +1,4 @@
-# Leveltronic
+# LevelApp Mobile
 
 Flutter companion app for precision inclinometers, over Bluetooth Low Energy.
 Android is the primary platform (an iOS scaffold exists but is untested).
@@ -9,13 +9,13 @@ Android is the primary platform (an iOS scaffold exists but is untested).
 
 | Family | Advertises as | Notes |
 |---|---|---|
-| Leveltronic precision level (STM32G0B1 / RN4871) | `Leveltronic-<xxxx>` | Firmware speaking API v3. Live S1 / S2 / Diff in mm/m, precision measurement, guided calibration (flip zero, phase, gain), all settings, diagnostics and oscilloscope view. |
+| Precision level (STM32G0B1 / RN4871) | `Leveltronic-<xxxx>` (the name existing units advertise) | Instruments speaking API v3.1 or newer. Live S1 / S2 / Diff in mm/m, precision measurement, guided calibration (flip zero, phase, gain), all settings, diagnostics and oscilloscope view. |
 | NeigMess2 capacitive inclination meter | `NeigMess2…` | API v2 over the same transport. Live tilt and sensors, flip-test zero, tilt trim and neutral calibration. |
 
 Several instruments can be connected at once; the device switcher in the top
 bar chooses which one the screens show. Instruments can be given names of
 your own. **Open demo instrument** on the scan screen runs a simulated
-Leveltronic, so the app can be tried without hardware.
+precision level, so the app can be tried without hardware.
 
 ## Development
 

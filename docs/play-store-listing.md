@@ -6,7 +6,7 @@ Working copy of everything to paste into the Play Console. Not shipped in the ap
 
 | Field | Value |
 |---|---|
-| App name (≤30 chars) | `Leveltronic` |
+| App name (≤30 chars) | `LevelApp Mobile` |
 | Package name (permanent) | `com.soldernerd.inclinometer` |
 | Category | Tools |
 | Free / Paid | Free |
@@ -16,15 +16,15 @@ Working copy of everything to paste into the Play Console. Not shipped in the ap
 ## Short description (≤80 chars)
 
 ```
-Live readings from your Leveltronic precision level over Bluetooth.
+Live readings and calibration for your precision level over Bluetooth.
 ```
 
 ## Full description (≤4000 chars)
 
 ```
-Leveltronic is the companion app for the Leveltronic precision level
-instrument. Connect over Bluetooth Low Energy and use your phone as a large,
-readable display and remote control:
+LevelApp Mobile is a companion app for precision level instruments. Connect
+over Bluetooth Low Energy and use your phone as a large, readable display and
+remote control:
 
 • Live readings: S1, S2 and the difference (S1 − S2) in mm/m, large and
   steady, with a vibration indicator that warns when the table is not quiet
@@ -43,7 +43,7 @@ The battery level and charging state are always visible. No account, no
 sign-in, no data collection: Bluetooth is used only to talk to your own
 instrument; nothing is recorded or sent anywhere.
 
-Requires instrument firmware 0.11 or newer.
+Requires an instrument that speaks API 3.1 (firmware 0.15 or newer).
 ```
 
 ## Privacy policy URL

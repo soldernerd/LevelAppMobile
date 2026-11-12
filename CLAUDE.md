@@ -1,19 +1,26 @@
-# Leveltronic BLE App
+# LevelApp Mobile (BLE app)
 
-Flutter/Dart companion app for the custom "Leveltronic" precision level
+Flutter/Dart companion app for a custom precision level
 instrument (STM32G0B1 / RN4871). The scaffold was built mock-first (phases
 1–7); real BLE is now wired against the REV B firmware.
 
 **Package:** `com.soldernerd.inclinometer`
-**Version:** 0.3.x — minor bumped for the multi-device architecture (CI: `major.minor` from `pubspec.yaml`, patch = git commit count)
+**Version:** 1.0.x (CI: `major.minor` from `pubspec.yaml`, patch = git commit count)
+**Naming:** the app is *LevelApp Mobile*. "Leveltronic" is a third-party (Wyler)
+trade name: never in user-visible text — app label, titles, display names, store
+listing, privacy policy. It remains only where the hardware dictates it (the BLE
+advertised-name prefix in `LeveltronicDriver.advertisedNamePrefixes` and the test
+fixtures that mimic it) and in internal identifiers (`lib/devices/leveltronic/`,
+`LeveltronicDriver`, route `/leveltronic`). The user-facing name of that device
+family is "Precision level".
 **Platform:** Android primary (iOS scaffold included, not tested)
 
-## Device reality (firmware 0.11+, API v3)
+## Device reality (API v3.1+)
 
 The firmware is `InclinationMeterFirmware` (repo also named "WylerLeveltronic").
 **Protocol:** its `docs/api-v3-spec.md`; **every resource:** its
 `docs/api-reference.md` (generated from `tools/api_spec.py`). The app speaks
-API v3 only (3.1 is the newest minor it knows, `kApiMinor`; IDENTITY `api_minor` is absent on firmware before 0.15.0 and reads as 3.0 — only the major decides compatibility, `ApiIdentity.atLeast(3, n)` gates newer features) — the Leveltronic driver refuses anything else
+API v3.1 and newer: `kApiMinMinor` (1) is the floor, `kApiMinor` (1) the newest minor it knows. The API counts, not the firmware version: IDENTITY `api_minor` is absent on firmware before 0.15.0 and reads as 3.0, which is refused. `ApiIdentity.atLeast(3, n)` gates newer features. The Leveltronic driver refuses anything else
 (`IncompatibleFirmwareException`, shown on the scan screen).
 
 - **Transport:** RN4871 **Transparent UART** — a raw byte stream carrying

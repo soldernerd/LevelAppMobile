@@ -12,6 +12,7 @@ import 'package:inclinometer/ble/mock_ble_manager.dart';
 import 'package:inclinometer/ble/simulated_peripheral.dart';
 import 'package:inclinometer/devices/device_driver.dart';
 import 'package:inclinometer/devices/leveltronic/leveltronic_driver.dart';
+import 'package:inclinometer/devices/neigmess2/neigmess_driver.dart';
 import 'package:inclinometer/devices/leveltronic/leveltronic_session.dart';
 import 'package:inclinometer/devices/leveltronic/simulated_device.dart';
 import 'package:inclinometer/models/connection.dart';
@@ -124,6 +125,12 @@ void main() {
       expect(r.acceptsAdvertisedName('Other-1'), isTrue);
       expect(r.acceptsAdvertisedName('Headphones'), isFalse);
       expect(r.acceptsAdvertisedName(''), isFalse);
+    });
+
+    test('no driver shows a third-party trade name to the user', () {
+      for (final d in const [LeveltronicDriver(), NeigMessDriver()]) {
+        expect(d.displayName.toLowerCase(), isNot(contains('leveltronic')));
+      }
     });
 
     test('the IDENTITY product, not the name, chooses the driver', () {

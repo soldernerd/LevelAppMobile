@@ -1,13 +1,13 @@
 ---
-title: Leveltronic — Privacy Policy
+title: LevelApp Mobile — Privacy Policy
 ---
 
-# Privacy Policy for Leveltronic
+# Privacy Policy for LevelApp Mobile
 
-**Last updated:** 2026-09-09
+**Last updated:** 2026-11-12
 
-Leveltronic ("the app") is a companion app for the Leveltronic precision
-level instrument. This policy explains what data the app handles.
+LevelApp Mobile ("the app") is a companion app for precision level
+instruments. This policy explains what data the app handles.
 
 ## Data the app collects
 
@@ -18,7 +18,7 @@ third‑party data‑collection SDKs.
 ## Bluetooth
 
 The app uses Bluetooth Low Energy solely to scan for, connect to, and
-exchange measurement data with your own Leveltronic instrument. Measurement
+exchange measurement data with your own instrument. Measurement
 values (angle, temperature, humidity, pressure, battery status) are shown
 live on screen and are not recorded or sent anywhere.
 

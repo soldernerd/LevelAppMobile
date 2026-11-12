@@ -68,7 +68,7 @@ Future<void> main() async {
     UncontrolledProviderScope(
       container: _container,
       child: MaterialApp.router(
-        title: 'Leveltronic',
+        title: 'LevelApp Mobile',
         // Dark theme only.
         theme: ThemeData.dark(),
         debugShowCheckedModeBanner: false,

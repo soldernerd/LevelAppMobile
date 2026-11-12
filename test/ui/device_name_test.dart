@@ -14,7 +14,7 @@ void main() {
       (tester) async {
     final h = await AppHarness.start(tester);
     final s = h.container.read(activeSessionProvider)!;
-    expect(find.text('Leveltronic'), findsOneWidget);
+    expect(find.text('Precision level'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('menu')));
     await tester.pumpAndSettle();

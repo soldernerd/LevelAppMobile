@@ -35,11 +35,15 @@ class LeveltronicDriver extends DeviceDriver {
   @override
   String get id => 'leveltronic';
 
+  /// Shown to the user. "Leveltronic" is a third-party trade name and must not
+  /// appear in the app's own wording; it stays only where the hardware dictates
+  /// it (the advertised BLE name below).
   @override
-  String get displayName => 'Leveltronic';
+  String get displayName => 'Precision level';
 
   /// The instrument advertises as `Leveltronic-<last 2 MAC bytes>` (firmware
-  /// `Config/config.h` `BLE_DEVICE_NAME`).
+  /// `Config/config.h` `BLE_DEVICE_NAME`). This is the scan filter, so it has to
+  /// match what existing units send.
   @override
   List<String> get advertisedNamePrefixes => const ['Leveltronic'];
 

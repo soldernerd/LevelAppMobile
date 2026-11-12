@@ -80,13 +80,15 @@ All functionality is available without any special access, login, or account.
 - Financial features: None
 - Health: Not a health app; makes no health claims
 
-## Store assets still needed
+## Store assets
 
-| Asset | Spec |
-|---|---|
-| App icon | 512×512 PNG, 32-bit, <1 MB |
-| Feature graphic | 1024×500 PNG/JPG |
-| Phone screenshots | ≥2, 16:9 or 9:16, each 320–3840 px |
+All in this repo; upload them as they are.
+
+| Asset | Spec | File |
+|---|---|---|
+| App icon | 512×512 PNG, 32-bit, <1 MB | `docs/store-graphics/app-icon-512.png` (full-bleed square; Play rounds it) |
+| Feature graphic | 1024×500 PNG/JPG | `docs/store-graphics/feature-graphic-1024x500.png` |
+| Phone screenshots | ≥2, 16:9 or 9:16 (long side at most 2× the short), each 320–3840 px | `docs/Screenshots/play/01-live.jpg` to `05-settings.jpg` (1080×2160) |
 | (optional) 7"/10" tablet screenshots | only if you list tablet support |
 
 ## Enabling the privacy-policy URL (GitHub Pages)

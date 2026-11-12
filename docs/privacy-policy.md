@@ -44,4 +44,4 @@ with a new "Last updated" date.
 
 ## Contact
 
-Questions about this policy: _add your contact email here before publishing._
+Questions about this policy: [info@soldernerd.com](mailto:info@soldernerd.com)

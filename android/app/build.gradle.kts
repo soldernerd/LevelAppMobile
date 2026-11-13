@@ -31,13 +31,22 @@ android {
         versionName = flutter.versionName
     }
 
-    // Distribution channels. Same applicationId — `github` is the sideload
-    // build (self-updater + REQUEST_INSTALL_PACKAGES, extras merged in from
-    // src/github/), `play` is the Google Play build (self-updater stripped).
+    // Distribution channels. `github` is the development / sideload build
+    // (self-updater + REQUEST_INSTALL_PACKAGES, extras merged in from
+    // src/github/): its own application id (`.dev`) and name, so it installs
+    // next to the Play app and updates itself from GitHub Releases. `play` is
+    // the Google Play build (self-updater stripped), the real application id.
     flavorDimensions += "distribution"
     productFlavors {
-        create("github") { dimension = "distribution" }
-        create("play") { dimension = "distribution" }
+        create("github") {
+            dimension = "distribution"
+            applicationIdSuffix = ".dev"
+            manifestPlaceholders["appLabel"] = "LevelApp Dev"
+        }
+        create("play") {
+            dimension = "distribution"
+            manifestPlaceholders["appLabel"] = "LevelApp Mobile"
+        }
     }
 
     signingConfigs {

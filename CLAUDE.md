@@ -165,7 +165,7 @@ template ships: Gradle 9.5.0, AGP 9.3.1, Kotlin 2.4.20 (Flutter 3.50 refuses Gra
 
 ## Distribution / build flavors
 
-Two Android product flavors (dimension `distribution`, same `applicationId`):
+Two Android product flavors (dimension `distribution`). `github` is the development build: application id `com.soldernerd.inclinometer.dev`, label "LevelApp Dev", installs next to the Play app and updates itself from GitHub Releases. `play` has the real id `com.soldernerd.inclinometer`. CI publishes the `play` bundle to the Play *internal* track on every push (no review); the closed-testing (Alpha) track is for deliberate releases to the external testers:
 
 | Flavor | Channel | Self-update | Manifest extras |
 |--------|---------|-------------|-----------------|

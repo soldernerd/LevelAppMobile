@@ -18,7 +18,7 @@ const Map<String, Color> kScopeColors = {
 const double kScopeFullScaleMv = 1200;
 
 /// The selectable full scales of the sensor panel, ± mV.
-const List<double> kScopeScalesMv = [1200, 600, 200, 100, 50, 20];
+const List<double> kScopeScalesMv = [1200, 600, 200, 100, 50, 20, 10, 5];
 
 /// Vertical shift of S2 against S1 as a fraction of the panel's half height,
 /// so nearly identical traces do not hide each other.

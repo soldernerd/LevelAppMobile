@@ -97,15 +97,17 @@ jobs:
           path: build/app/outputs/bundle/playRelease/app-play-release.aab
           if-no-files-found: error
 
-      # Once a Play service account JSON is stored as the PLAY_SERVICE_ACCOUNT_JSON
-      # secret, replace the artifact upload above with a direct publish:
-      #
-      # - name: Publish to Google Play (internal track)
-      #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      #   uses: r0adkll/upload-google-play@v1
-      #   with:
-      #     serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-      #     packageName: com.soldernerd.inclinometer
-      #     releaseFiles: build/app/outputs/bundle/playRelease/app-play-release.aab
-      #     track: internal
-      #     status: completed
+      # Publishes the bundle to the closed-testing track "Alpha" (track id
+      # `alpha`) as soon as the PLAY_SERVICE_ACCOUNT_JSON secret exists; without
+      # it this step is skipped and the artifact above is uploaded by hand.
+      - name: Publish to Google Play (closed testing: alpha)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.HAVE_PLAY_KEY == 'true'
+        env:
+          HAVE_PLAY_KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.soldernerd.inclinometer
+          releaseFiles: build/app/outputs/bundle/playRelease/app-play-release.aab
+          track: alpha
+          status: completed

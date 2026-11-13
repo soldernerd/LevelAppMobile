@@ -12,6 +12,10 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # 'true' once the Play service account secret exists (a step's own env is
+      # not visible to its `if`, so it lives on the job).
+      HAVE_PLAY_KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -100,10 +104,8 @@ jobs:
       # Publishes the bundle to the closed-testing track "Alpha" (track id
       # `alpha`) as soon as the PLAY_SERVICE_ACCOUNT_JSON secret exists; without
       # it this step is skipped and the artifact above is uploaded by hand.
-      - name: Publish to Google Play (closed testing: alpha)
+      - name: Publish to Google Play (closed testing, alpha track)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.HAVE_PLAY_KEY == 'true'
-        env:
-          HAVE_PLAY_KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
